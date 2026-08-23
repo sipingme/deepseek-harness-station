@@ -1,0 +1,17 @@
+onlyBuiltDependencies:
+  - '@deepseek-ai/dsh-subprocess-local'
+  - electron
+  - esbuild
+  - koffi
+  - node-pty
+
+ignoredBuiltDependencies:
+  - '@google/genai'
+  - protobufjs
+
+allowBuilds:
+  '@deepseek-ai/dsh-subprocess-local': set this to true or false
+  '@google/genai': set this to true or false
+  koffi: set this to true or false
+  node-pty: set this to true or false
+  protobufjs: set this to true or false

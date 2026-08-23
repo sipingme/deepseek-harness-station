@@ -1,0 +1,39 @@
+{
+  "name": "deepseek-harness-station",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Electron workstation for DeepSeek Harness with an independently supervised Host",
+  "license": "MIT",
+  "type": "module",
+  "packageManager": "pnpm@11.7.0",
+  "engines": {
+    "node": "^22.19.0 || >=24.0.0"
+  },
+  "main": "lib/shell/main.js",
+  "scripts": {
+    "build": "tsdown && tsc -p tsconfig.json --emitDeclarationOnly",
+    "dev": "pnpm run build && electron lib/shell/main.js",
+    "start": "electron lib/shell/main.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "check": "pnpm run typecheck && pnpm run test && pnpm run build"
+  },
+  "dependencies": {
+    "@deepseek-ai/cordis": "4.0.1",
+    "@deepseek-ai/cordis-plugin-include": "1.0.6",
+    "@deepseek-ai/dsh": "0.1.0-rc.7",
+    "@deepseek-ai/dsh-app-boot": "0.1.0-rc.7",
+    "@deepseek-ai/dsh-cmdline": "0.1.0-rc.7",
+    "@deepseek-ai/dsh-home-paths": "0.1.0-rc.7",
+    "@deepseek-ai/dsh-host-webserver": "0.1.0-rc.7",
+    "@deepseek-ai/dsh-launch-environment": "0.1.0-rc.7",
+    "electron": "43.4.0",
+    "node-addon-require-builtin": "^0.1.4"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.0",
+    "tsdown": "0.22.2",
+    "typescript": "6.0.3",
+    "vitest": "4.1.8"
+  }
+}
