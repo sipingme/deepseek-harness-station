@@ -50,6 +50,8 @@ await run(`Create macOS ${process.arch} artifacts`, 'pnpm', [
   'dmg',
   'zip',
   `--${process.arch}`,
+  '--publish',
+  'never',
 ])
 await run('Verify DMG and ZIP artifacts', process.execPath, ['scripts/verify-mac-artifacts.mjs', process.arch])
 console.log(`\nDeepSeek Harness Station macOS ${process.arch} distribution completed successfully.`)
