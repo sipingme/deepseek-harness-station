@@ -24,7 +24,13 @@ async function run(label, command, args) {
       if (code === 0) resolveRun()
       else {
         if (process.env.GITHUB_ACTIONS === 'true') {
-          const detail = output.trim().split(/\r?\n/).slice(-30).join('\n')
+          const detail = output.trim().split(/\r?\n/)
+            .filter(line => !line.includes('duplicate dependency references')
+              && !line.includes('platform-specific optional dependencies not bundled')
+              && !line.includes('dependency not found on disk'))
+            .slice(-30)
+            .map(line => line.length > 1_000 ? '[truncated verbose dependency line]' : line)
+            .join('\n')
           const escaped = detail.replaceAll('%', '%25').replaceAll('\r', '%0D').replaceAll('\n', '%0A')
           console.log(`::error title=${label.replaceAll(',', '%2C').replaceAll(':', '%3A')}::${escaped}`)
         }
