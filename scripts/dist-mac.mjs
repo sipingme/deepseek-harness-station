@@ -9,11 +9,27 @@ const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 async function run(label, command, args) {
   console.log(`\n==> ${label}`)
   await new Promise((resolveRun, reject) => {
-    const child = spawn(command, args, { cwd: projectRoot, stdio: 'inherit' })
+    let output = ''
+    const child = spawn(command, args, { cwd: projectRoot, stdio: ['inherit', 'pipe', 'pipe'] })
+    const forward = (stream, destination) => {
+      stream?.on('data', chunk => {
+        destination.write(chunk)
+        output = `${output}${chunk.toString()}`.slice(-16_000)
+      })
+    }
+    forward(child.stdout, process.stdout)
+    forward(child.stderr, process.stderr)
     child.once('error', reject)
     child.once('exit', (code, signal) => {
       if (code === 0) resolveRun()
-      else reject(new Error(`${label} failed (${code ?? signal ?? 'unknown'})`))
+      else {
+        if (process.env.GITHUB_ACTIONS === 'true') {
+          const detail = output.trim().split(/\r?\n/).slice(-30).join('\n')
+          const escaped = detail.replaceAll('%', '%25').replaceAll('\r', '%0D').replaceAll('\n', '%0A')
+          console.log(`::error title=${label.replaceAll(',', '%2C').replaceAll(':', '%3A')}::${escaped}`)
+        }
+        reject(new Error(`${label} failed (${code ?? signal ?? 'unknown'})`))
+      }
     })
   })
 }
