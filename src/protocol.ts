@@ -8,6 +8,7 @@ export interface StartHostCommand {
   readonly generationId: string
   readonly token: string
   readonly profile: string
+  readonly workDir: string
 }
 
 /** Graceful stop request for the active Host generation. */
@@ -56,13 +57,16 @@ export function parseShellMessage(value: unknown): ShellToHostMessage | undefine
     || typeof value.token !== 'string'
     || value.token.length < 43
     || typeof value.profile !== 'string'
-    || value.profile.length === 0) return undefined
+    || value.profile.length === 0
+    || typeof value.workDir !== 'string'
+    || value.workDir.length === 0) return undefined
   return {
     type: 'start',
     protocolVersion: STATION_PROTOCOL_VERSION,
     generationId: value.generationId,
     token: value.token,
     profile: value.profile,
+    workDir: value.workDir,
   }
 }
 

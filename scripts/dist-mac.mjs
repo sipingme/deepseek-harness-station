@@ -1,0 +1,33 @@
+import { spawn } from 'node:child_process'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+if (process.platform !== 'darwin') throw new Error('dist:mac must run on macOS')
+if (process.arch !== 'x64' && process.arch !== 'arm64') throw new Error(`Unsupported macOS architecture: ${process.arch}`)
+const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
+
+async function run(label, command, args) {
+  console.log(`\n==> ${label}`)
+  await new Promise((resolveRun, reject) => {
+    const child = spawn(command, args, { cwd: projectRoot, stdio: 'inherit' })
+    child.once('error', reject)
+    child.once('exit', (code, signal) => {
+      if (code === 0) resolveRun()
+      else reject(new Error(`${label} failed (${code ?? signal ?? 'unknown'})`))
+    })
+  })
+}
+
+await run('Quality gate', 'pnpm', ['check'])
+await run('Generate application icons', process.execPath, ['scripts/generate-icon.mjs'])
+await run('Generate third-party notices', process.execPath, ['scripts/generate-notices.mjs'])
+await run(`Create macOS ${process.arch} artifacts`, 'pnpm', [
+  'exec',
+  'electron-builder',
+  '--mac',
+  'dmg',
+  'zip',
+  `--${process.arch}`,
+])
+await run('Verify DMG and ZIP artifacts', process.execPath, ['scripts/verify-mac-artifacts.mjs', process.arch])
+console.log(`\nDeepSeek Harness Station macOS ${process.arch} distribution completed successfully.`)

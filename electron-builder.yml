@@ -1,0 +1,77 @@
+appId: com.siping.deepseek-harness-station
+productName: DeepSeek Harness Station
+copyright: Copyright © 2026 DeepSeek Harness Station contributors
+asar: true
+directories:
+  output: dist
+  buildResources: build-resources
+files:
+  - lib/**/*
+  - package.json
+  - LICENSE
+  - THIRD_PARTY_NOTICES.txt
+  - '!lib/types{,/**/*}'
+  - '!**/*.map'
+asarUnpack:
+  - lib/host{,/**/*}
+  - lib/protocol.js
+  - node_modules/**/*
+extraResources:
+  - from: build-resources/icon.ico
+    to: icon.ico
+  - from: build-resources/icon.png
+    to: icon.png
+  - from: build-resources/runtime-package.json
+    to: app.asar.unpacked/package.json
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  icon: build-resources/icon.ico
+  artifactName: DeepSeek-Harness-Station-${version}-x64-Setup.${ext}
+  files:
+    - lib/**/*
+    - package.json
+    - LICENSE
+    - THIRD_PARTY_NOTICES.txt
+    - '!lib/types{,/**/*}'
+    - '!**/*.map'
+    - '!node_modules/**/prebuilds/darwin-{arm64,x64}{,/**/*}'
+    - '!node_modules/**/prebuilds/linux-{arm64,x64}{,/**/*}'
+    - '!node_modules/**/prebuilds/win32-arm64{,/**/*}'
+    - '!node_modules/**/third_party/**/win10-arm64{,/**/*}'
+    - '!node_modules/@koromix/koffi-win32-arm64{,/**/*}'
+nsis:
+  oneClick: false
+  perMachine: false
+  allowElevation: true
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: DeepSeek Harness Station
+  uninstallDisplayName: DeepSeek Harness Station
+  deleteAppDataOnUninstall: false
+mac:
+  target:
+    - dmg
+    - zip
+  icon: build-resources/icon.png
+  category: public.app-category.developer-tools
+  minimumSystemVersion: 12.0.0
+  artifactName: DeepSeek-Harness-Station-${version}-${arch}.${ext}
+  files:
+    - lib/**/*
+    - package.json
+    - LICENSE
+    - THIRD_PARTY_NOTICES.txt
+    - '!lib/types{,/**/*}'
+    - '!**/*.map'
+    - '!node_modules/**/prebuilds/win32-{arm64,x64}{,/**/*}'
+    - '!node_modules/**/prebuilds/linux-{arm64,x64}{,/**/*}'
+    - '!node_modules/**/third_party/**/win10-{arm64,x64}{,/**/*}'
+    - '!node_modules/@koromix/koffi-win32-*{,/**/*}'
+    - '!node_modules/@koromix/koffi-linux-*{,/**/*}'
+dmg:
+  title: DeepSeek Harness Station ${version}
+afterPack: ./scripts/after-pack.cjs

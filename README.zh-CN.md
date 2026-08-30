@@ -31,12 +31,36 @@ corepack pnpm dev
 
 默认 Host 会加载已发布 `@deepseek-ai/dsh` 包中的标准 `web` 配置档案。Harness 凭据和用户配置继续沿用原有的 `$DSH_HOME` 行为。
 
-## 当前范围
+## Windows 安装包
 
-第一个里程碑包含：进程拆分、Web 配置档案启动、受保护的导航、单实例行为、有界启动，以及 Host 的正常释放。打包、配置档案选择界面、更新器集成、托盘控制、崩溃循环恢复和带认证的浏览器引导仍属于后续里程碑。
+在 Windows x64 上执行：
+
+```sh
+corepack pnpm dist:win
+```
+
+流水线会依次完成类型检查、测试、构建、图标与第三方许可证声明生成、ASAR/物理 Host 闭包检查、成品启动与单实例冒烟、NSIS 安装器生成和 PE 校验。安装器输出到 `dist/DeepSeek-Harness-Station-<version>-x64-Setup.exe`。
+
+当前桌面版本包含：独立且按 generation 隔离的 Node Host、标准 `web` 配置档案、沙箱化回环 Renderer、单实例重新聚焦、系统托盘打开/重启 Host/退出、启动超时、进程树清理、有限次数的崩溃自动恢复，以及可选择安装目录的按用户 NSIS 安装/卸载。
+
+用户凭据、Harness 配置档案和插件继续保存在 `$DSH_HOME`；临时 Host 根配置位于 `$DSH_HOME/profiles/web/.station-generations`，这样既保持每代隔离，也保留 Harness 的 profile 插件解析链，退出后会自动清理。卸载默认保留用户数据。
+
+## macOS 安装包
+
+在 macOS 上执行：
+
+```sh
+corepack pnpm dist:mac
+```
+
+macOS 流水线会为当前架构生成并校验 DMG、ZIP；GitHub Actions 分别使用原生 Intel（`x64`）和 Apple Silicon（`arm64`）runner 执行。校验内容包括 Mach-O 架构、ASAR 内容、完整 Harness Host 依赖闭包，以及对应架构的 `node-pty`、`koffi` 原生模块。
+
+## GitHub Actions
+
+每次推送到 `main`，或手动运行 workflow 时，`.github/workflows/build-desktop.yml` 都会启动。Windows job 上传经过验证的 x64 NSIS 安装器；macOS job 上传 x64、arm64 两套 DMG 和 ZIP。构建产物在 GitHub Actions 中保留 14 天。
 
 ## 项目状态
 
-这是预发布软件。在首个带标签的版本发布前，生命周期协议可能会发生变化。
+这是预发布软件。当前安装包尚未签名或公证：Windows 可能显示“未知发布者”，macOS 可能需要通过右键“打开”确认运行。正式外部分发前应配置 Authenticode、Apple Developer ID 签名与 notarization。自动更新需要发布服务器，尚未启用。
 
 DeepSeek Harness Station 是基于 DeepSeek Harness 构建的独立社区项目，与 DeepSeek 没有隶属或背书关系。

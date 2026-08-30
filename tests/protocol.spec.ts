@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseHostMessage, parseShellMessage, STATION_PROTOCOL_VERSION } from '../src/protocol.ts'
+import { parseHostMessage, parseShellMessage, STATION_PROTOCOL_VERSION } from '../src/protocol.js'
 
 describe('Station lifecycle protocol', () => {
   it('accepts a complete start command', () => {
@@ -9,12 +9,14 @@ describe('Station lifecycle protocol', () => {
       generationId: 'generation-1',
       token: 'a'.repeat(43),
       profile: 'web',
+      workDir: 'C:\\station\\generation-1',
     })).toEqual({
       type: 'start',
       protocolVersion: STATION_PROTOCOL_VERSION,
       generationId: 'generation-1',
       token: 'a'.repeat(43),
       profile: 'web',
+      workDir: 'C:\\station\\generation-1',
     })
   })
 
@@ -25,6 +27,7 @@ describe('Station lifecycle protocol', () => {
       generationId: 'generation-1',
       token: 'short',
       profile: 'web',
+      workDir: 'C:\\station\\generation-1',
     })).toBeUndefined()
   })
 
