@@ -30,6 +30,13 @@ default:
 
 windows-x64:
   extends: .package
+  variables:
+    # These variables are present while GitLab Runner fetches and cleans the
+    # worktree, before before_script can run. This is required for deep pnpm
+    # dependency paths on Windows.
+    GIT_CONFIG_COUNT: "1"
+    GIT_CONFIG_KEY_0: "core.longpaths"
+    GIT_CONFIG_VALUE_0: "true"
   tags:
     - windows
     - x64
