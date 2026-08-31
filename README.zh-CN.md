@@ -59,6 +59,8 @@ macOS 流水线会为当前架构生成并校验 DMG、ZIP；GitHub Actions 分�
 
 每次推送到 `main`，或手动运行 workflow 时，`.github/workflows/build-desktop.yml` 都会启动。Windows job 上传经过验证的 x64 NSIS 安装器；macOS job 上传 x64、arm64 两套 DMG 和 ZIP。构建产物在 GitHub Actions 中保留 14 天。
 
+GitLab 会在默认分支、标签和手动启动流水线时运行等价的 `.gitlab-ci.yml`。三类原生 Shell Runner 需要预装 Node.js 24 与 Corepack，并分别带有 `windows` + `x64`、`macos` + `x64`、`macos` + `arm64` 标签组合。通过校验的 EXE、blockmap、DMG 和 ZIP 会作为流水线产物保留 14 天。
+
 ## 项目状态
 
 这是预发布软件。当前安装包尚未签名或公证：Windows 可能显示“未知发布者”，macOS 可能需要通过右键“打开”确认运行。正式外部分发前应配置 Authenticode、Apple Developer ID 签名与 notarization。自动更新需要发布服务器，尚未启用。

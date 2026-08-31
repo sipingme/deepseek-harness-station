@@ -59,6 +59,8 @@ The macOS pipeline builds and structurally verifies DMG and ZIP artifacts for th
 
 Every push to `main`, and every manual workflow dispatch, runs `.github/workflows/build-desktop.yml`. The Windows job uploads the verified x64 NSIS installer; the macOS job uploads x64 and arm64 DMG and ZIP packages. Build artifacts are retained in GitHub Actions for 14 days.
 
+GitLab runs the equivalent `.gitlab-ci.yml` pipeline for the default branch, tags, and manually started pipelines. The three native Shell runners must provide Node.js 24 plus Corepack and carry the tag pairs `windows` + `x64`, `macos` + `x64`, and `macos` + `arm64`. The verified EXE, blockmap, DMG, and ZIP outputs are retained as pipeline artifacts for 14 days.
+
 ## Project status
 
 This is pre-release software. The current packages are not signed or notarized: Windows may show an unknown-publisher warning and macOS may require an explicit Open action. Configure Authenticode and Apple Developer ID signing/notarization before public distribution. Automatic updates require a release feed and are not enabled.

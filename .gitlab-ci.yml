@@ -1,0 +1,72 @@
+stages:
+  - package
+
+workflow:
+  rules:
+    - if: '$CI_COMMIT_TAG'
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+    - when: never
+
+default:
+  interruptible: true
+  retry:
+    max: 1
+    when:
+      - runner_system_failure
+      - stuck_or_timeout_failure
+  cache:
+    key: "pnpm-${CI_JOB_NAME}"
+    paths:
+      - .pnpm-store/
+
+.package:
+  stage: package
+  before_script:
+    - node --version
+    - corepack pnpm --version
+    - corepack pnpm config set store-dir .pnpm-store
+    - corepack pnpm install --frozen-lockfile
+
+windows-x64:
+  extends: .package
+  tags:
+    - windows
+    - x64
+  script:
+    - corepack pnpm dist:win
+    - corepack pnpm smoke:installer
+  artifacts:
+    name: "DeepSeek-Harness-Station-Windows-x64-${CI_COMMIT_SHORT_SHA}"
+    expire_in: 14 days
+    paths:
+      - dist/DeepSeek-Harness-Station-*-x64-Setup.exe
+      - dist/DeepSeek-Harness-Station-*-x64-Setup.exe.blockmap
+
+macos-x64:
+  extends: .package
+  tags:
+    - macos
+    - x64
+  script:
+    - corepack pnpm dist:mac
+  artifacts:
+    name: "DeepSeek-Harness-Station-macOS-x64-${CI_COMMIT_SHORT_SHA}"
+    expire_in: 14 days
+    paths:
+      - dist/DeepSeek-Harness-Station-*-x64.dmg
+      - dist/DeepSeek-Harness-Station-*-x64.zip
+
+macos-arm64:
+  extends: .package
+  tags:
+    - macos
+    - arm64
+  script:
+    - corepack pnpm dist:mac
+  artifacts:
+    name: "DeepSeek-Harness-Station-macOS-arm64-${CI_COMMIT_SHORT_SHA}"
+    expire_in: 14 days
+    paths:
+      - dist/DeepSeek-Harness-Station-*-arm64.dmg
+      - dist/DeepSeek-Harness-Station-*-arm64.zip
