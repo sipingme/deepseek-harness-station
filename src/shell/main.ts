@@ -110,6 +110,17 @@ async function startAndLoad(): Promise<string> {
   return ready.origin
 }
 
+async function pickWorkspaceDirectory(): Promise<string | null> {
+  const options: Electron.OpenDialogOptions = {
+    title: 'Select Workspace Directory',
+    properties: ['openDirectory', 'createDirectory'],
+  }
+  const result = window === undefined || window.isDestroyed()
+    ? await dialog.showOpenDialog(options)
+    : await dialog.showOpenDialog(window, options)
+  return result.canceled ? null : result.filePaths[0] ?? null
+}
+
 function createTray(): void {
   const source = nativeImage.createFromPath(applicationIconPath())
   const icon = process.platform === 'darwin' ? source.resize({ width: 22, height: 22 }) : source
@@ -179,6 +190,7 @@ async function launch(): Promise<void> {
     // Keep the generated root below the profile so Node's parent lookup reaches
     // profile-local plugins first, then the installation fallback at profiles/node_modules.
     workRoot: generationWorkRoot(resolveDshHome(), 'web'),
+    pickDirectory: pickWorkspaceDirectory,
     onUnexpectedExit: event => { void recoverHost(event) },
   })
   if (smokeFile === undefined) createTray()

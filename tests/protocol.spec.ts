@@ -45,4 +45,20 @@ describe('Station lifecycle protocol', () => {
       origin: 'https://example.com',
     })).toBeUndefined()
   })
+
+  it('validates native directory picker IPC in both directions', () => {
+    expect(parseHostMessage({
+      type: 'pick-directory',
+      protocolVersion: STATION_PROTOCOL_VERSION,
+      generationId: 'generation-1',
+      requestId: 'request-1',
+    })?.type).toBe('pick-directory')
+    expect(parseShellMessage({
+      type: 'pick-directory-result',
+      protocolVersion: STATION_PROTOCOL_VERSION,
+      generationId: 'generation-1',
+      requestId: 'request-1',
+      path: 'D:\\2026',
+    })?.type).toBe('pick-directory-result')
+  })
 })

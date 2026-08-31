@@ -29,7 +29,7 @@ corepack pnpm check
 corepack pnpm dev
 ```
 
-默认 Host 会加载已发布 `@deepseek-ai/dsh` 包中的标准 `web` 配置档案。Harness 凭据和用户配置继续沿用原有的 `$DSH_HOME` 行为。
+默认 Host 会加载已发布 `@deepseek-ai/dsh` 包中的标准 `web` 配置档案。Station 会将 OpenAI 兼容服务 `http://172.16.144.161:8000/v1` 中的 `Qwen3.8-27B-FP8` 注册为新会话的默认模型，默认不鉴权。由于底层 OpenAI 客户端要求凭据字段存在，无鉴权模式会发送一个固定、非秘密的兼容占位 Authorization；服务端无需验证它。可通过继承环境、项目 `.env` 或 `$DSH_HOME/.env` 中的 `LLM_MODEL_NAME`、`LLM_BASE_URL` 和可选的非空 `LLM_API_KEY` 覆盖这些启动默认值。Harness 的模型设置、凭据和用户 patch 层继续沿用原有的 `$DSH_HOME` 行为，并且优先级高于 Station 默认值。
 
 ## Windows 安装包
 

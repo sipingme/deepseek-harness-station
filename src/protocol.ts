@@ -17,8 +17,18 @@ export interface StopHostCommand {
   readonly generationId: string
 }
 
+/** Native directory-picker result returned by the Electron Shell. */
+export interface PickDirectoryResult {
+  readonly type: 'pick-directory-result'
+  readonly protocolVersion: number
+  readonly generationId: string
+  readonly requestId: string
+  readonly path: string | null
+  readonly error?: string
+}
+
 /** Messages accepted by the Host over the private parent-child channel. */
-export type ShellToHostMessage = StartHostCommand | StopHostCommand
+export type ShellToHostMessage = StartHostCommand | StopHostCommand | PickDirectoryResult
 
 /** Host readiness published only after the complete Harness tree activates. */
 export interface HostReadyEvent {
@@ -41,8 +51,16 @@ export interface HostStoppedEvent {
   readonly generationId: string
 }
 
+/** Request for the Electron Shell to show its native directory dialog. */
+export interface PickDirectoryRequest {
+  readonly type: 'pick-directory'
+  readonly protocolVersion: number
+  readonly generationId: string
+  readonly requestId: string
+}
+
 /** Messages emitted by the Host over the private parent-child channel. */
-export type HostToShellMessage = HostReadyEvent | HostFailedEvent | HostStoppedEvent
+export type HostToShellMessage = HostReadyEvent | HostFailedEvent | HostStoppedEvent | PickDirectoryRequest
 
 function record(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -52,6 +70,21 @@ function record(value: unknown): value is Record<string, unknown> {
 export function parseShellMessage(value: unknown): ShellToHostMessage | undefined {
   if (!record(value) || typeof value.type !== 'string' || typeof value.generationId !== 'string') return undefined
   if (value.type === 'stop') return { type: 'stop', generationId: value.generationId }
+  if (value.type === 'pick-directory-result'
+    && value.protocolVersion === STATION_PROTOCOL_VERSION
+    && typeof value.requestId === 'string'
+    && value.requestId.length > 0
+    && (typeof value.path === 'string' || value.path === null)
+    && (value.error === undefined || typeof value.error === 'string')) {
+    return {
+      type: 'pick-directory-result',
+      protocolVersion: STATION_PROTOCOL_VERSION,
+      generationId: value.generationId,
+      requestId: value.requestId,
+      path: value.path,
+      ...(value.error === undefined ? {} : { error: value.error }),
+    }
+  }
   if (value.type !== 'start'
     || value.protocolVersion !== STATION_PROTOCOL_VERSION
     || typeof value.token !== 'string'
@@ -88,5 +121,16 @@ export function parseHostMessage(value: unknown): HostToShellMessage | undefined
     return { type: 'failed', generationId: value.generationId, message: value.message }
   }
   if (value.type === 'stopped') return { type: 'stopped', generationId: value.generationId }
+  if (value.type === 'pick-directory'
+    && value.protocolVersion === STATION_PROTOCOL_VERSION
+    && typeof value.requestId === 'string'
+    && value.requestId.length > 0) {
+    return {
+      type: 'pick-directory',
+      protocolVersion: STATION_PROTOCOL_VERSION,
+      generationId: value.generationId,
+      requestId: value.requestId,
+    }
+  }
   return undefined
 }

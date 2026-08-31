@@ -29,7 +29,7 @@ corepack pnpm check
 corepack pnpm dev
 ```
 
-The default Host loads the standard `web` profile from the published `@deepseek-ai/dsh` installation. Harness credentials and user configuration retain their normal `$DSH_HOME` behavior.
+The default Host loads the standard `web` profile from the published `@deepseek-ai/dsh` installation. Station registers the OpenAI-compatible `Qwen3.8-27B-FP8` deployment at `http://172.16.144.161:8000/v1` as the default model for new sessions. The endpoint is used without authentication by default. Because the underlying OpenAI client requires a credential field, unauthenticated mode sends a fixed, non-secret compatibility Authorization placeholder that the server need not validate. `LLM_MODEL_NAME`, `LLM_BASE_URL`, and an optional non-empty `LLM_API_KEY` can override these launch defaults from the inherited environment, the project `.env`, or `$DSH_HOME/.env`. Harness model settings, credentials, and user patch layers retain their normal `$DSH_HOME` behavior and take precedence over the Station defaults.
 
 ## Windows installer
 

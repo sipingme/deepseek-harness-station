@@ -23,6 +23,9 @@ import {
   type HostToShellMessage,
   type StartHostCommand,
 } from '../protocol.js'
+import { stationDirectoryPickerPatches } from './directory-picker.js'
+import { stationModelPatches } from './model-config.js'
+import { shippedAgentPresetPatches } from './profile-config.js'
 import { prepareGenerationRoot } from './workspace.js'
 
 const NAME = 'dsh-station-host'
@@ -48,25 +51,34 @@ function installationAnchor(): string {
   return require.resolve('@deepseek-ai/dsh/package.json')
 }
 
-function composeProfile(command: StartHostCommand): { root: string; patches: PatchOptions[]; anchor: string } {
+function composeProfile(
+  command: StartHostCommand,
+  environment: ReturnType<typeof loadLayeredEnv>,
+): { root: string; patches: PatchOptions[]; anchor: string } {
   const anchor = installationAnchor()
   healProfilesModuleFallback(anchor)
   const profile = loadProfile(NAME, command.profile, anchor)
   const homeLayer = loadOptionalPatches(NAME, join(resolveDshHome(), PROFILE_PATCH_FILENAME)) ?? []
+  const lowerPatches = [
+    ...profile.layers.flatMap(layer => layer.patches),
+    ...stationModelPatches(environment),
+    ...stationDirectoryPickerPatches(command.generationId),
+    ...profile.patches,
+    ...homeLayer,
+  ]
   return {
     root: prepareGenerationRoot(command.workDir),
     anchor,
     patches: structuredClone([
-      ...profile.layers.flatMap(layer => layer.patches),
-      ...profile.patches,
-      ...homeLayer,
+      ...lowerPatches,
+      ...shippedAgentPresetPatches(anchor, lowerPatches),
     ]),
   }
 }
 
 async function bootHost(command: StartHostCommand): Promise<Context> {
-  const profile = composeProfile(command)
   const environment = loadLayeredEnv(NAME)
+  const profile = composeProfile(command, environment)
   return await boot(NAME, profile.root, profile.patches, (ctx) => {
     ctx.provide(DSH_LAUNCH_ENVIRONMENT_KEY, environment)
     provideCmdline(ctx, {
@@ -142,7 +154,7 @@ process.on('message', (raw: unknown) => {
   const message = parseShellMessage(raw)
   if (message === undefined) return
   if (message.type === 'stop') void stop(message.generationId)
-  else void start(message)
+  else if (message.type === 'start') void start(message)
 })
 
 async function shutdown(): Promise<void> {

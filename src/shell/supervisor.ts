@@ -6,7 +6,12 @@ import { mkdir, readdir, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { parseHostMessage, STATION_PROTOCOL_VERSION, type HostReadyEvent } from '../protocol.js'
+import {
+  parseHostMessage,
+  STATION_PROTOCOL_VERSION,
+  type HostReadyEvent,
+  type PickDirectoryRequest,
+} from '../protocol.js'
 
 const START_TIMEOUT_MS = 45_000
 const STOP_TIMEOUT_MS = 5_000
@@ -24,6 +29,7 @@ export interface HostSupervisorOptions {
   readonly stopTimeoutMs?: number
   readonly executable?: string
   readonly environment?: NodeJS.ProcessEnv
+  readonly pickDirectory?: () => Promise<string | null>
   readonly onUnexpectedExit?: (event: UnexpectedHostExit) => void
 }
 
@@ -74,6 +80,10 @@ export class HostSupervisor {
     this.stopping = false
     child.stdout?.pipe(process.stdout)
     child.stderr?.pipe(process.stderr)
+    child.on('message', raw => {
+      const message = parseHostMessage(raw)
+      if (message?.type === 'pick-directory') void this.answerDirectoryPicker(child, message)
+    })
 
     let ready = false
     child.once('exit', (code, signal) => {
@@ -176,6 +186,32 @@ export class HostSupervisor {
       })
       killer.once('exit', () => resolveKill())
     })
+  }
+
+  private async answerDirectoryPicker(child: ChildProcess, request: PickDirectoryRequest): Promise<void> {
+    if (this.child !== child || this.generationId !== request.generationId || !child.connected) return
+    try {
+      if (this.options.pickDirectory === undefined) throw new Error('Station Shell has no native directory picker')
+      const path = await this.options.pickDirectory()
+      if (this.child !== child || this.generationId !== request.generationId || !child.connected) return
+      child.send({
+        type: 'pick-directory-result',
+        protocolVersion: STATION_PROTOCOL_VERSION,
+        generationId: request.generationId,
+        requestId: request.requestId,
+        path,
+      })
+    } catch (cause: unknown) {
+      if (this.child !== child || this.generationId !== request.generationId || !child.connected) return
+      child.send({
+        type: 'pick-directory-result',
+        protocolVersion: STATION_PROTOCOL_VERSION,
+        generationId: request.generationId,
+        requestId: request.requestId,
+        path: null,
+        error: cause instanceof Error ? cause.message : String(cause),
+      })
+    }
   }
 
   private clear(child: ChildProcess): void {
