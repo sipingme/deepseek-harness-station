@@ -17,7 +17,7 @@
     "start": "electron lib/shell/main.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
-    "check": "pnpm run typecheck && pnpm run test && pnpm run build",
+    "check": "corepack pnpm run typecheck && corepack pnpm run test && corepack pnpm run build",
     "generate:icon": "node scripts/generate-icon.mjs",
     "generate:notices": "node scripts/generate-notices.mjs",
     "package:dir": "pnpm run build && pnpm run generate:icon && pnpm run generate:notices && electron-builder --win --x64 --dir",
