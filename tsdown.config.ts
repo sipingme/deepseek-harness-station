@@ -10,6 +10,7 @@ export default defineConfig([
       'shell/main': 'src/shell/main.ts',
       'shell/paths': 'src/shell/paths.ts',
       'shell/supervisor': 'src/shell/supervisor.ts',
+      'shell/update-checker': 'src/shell/update-checker.ts',
       protocol: 'src/protocol.ts',
     },
     outDir: 'lib',

@@ -6,18 +6,23 @@ import { app, BrowserWindow, dialog, Menu, nativeImage, shell, Tray } from 'elec
 import { resolveDshHome } from '@deepseek-ai/dsh-home-paths'
 import { HostSupervisor, type UnexpectedHostExit } from './supervisor.js'
 import { generationWorkRoot } from './paths.js'
+import { checkForUpdate, type UpdateCheckResult } from './update-checker.js'
 
 const PRODUCT_NAME = 'DeepSeek Harness Station'
 const smokeFile = process.env.STATION_SMOKE_FILE
 const smokeHoldMs = Number(process.env.STATION_SMOKE_HOLD_MS ?? '0')
 const recoveryLimit = 3
 const recoveryWindowMs = 60_000
+const updateCheckIntervalMs = 6 * 60 * 60 * 1_000
+const initialUpdateCheckDelayMs = 10_000
 
 let supervisor: HostSupervisor
 let window: BrowserWindow | undefined
 let tray: Tray | undefined
 let quitting = false
 let recovering = false
+let checkingForUpdate = false
+let lastNotifiedVersion: string | undefined
 const recoveryAttempts: number[] = []
 
 function applicationIconPath(): string {
@@ -121,6 +126,66 @@ async function pickWorkspaceDirectory(): Promise<string | null> {
   return result.canceled ? null : result.filePaths[0] ?? null
 }
 
+async function showUpdateResult(result: UpdateCheckResult, manual: boolean): Promise<void> {
+  if (!result.updateAvailable) {
+    if (manual) {
+      await dialog.showMessageBox({
+        type: 'info',
+        title: '检查更新',
+        message: '当前已是最新版本',
+        detail: `DeepSeek Harness Station ${result.currentVersion}`,
+        buttons: ['确定'],
+      })
+    }
+    return
+  }
+  if (!manual && lastNotifiedVersion === result.latestVersion) return
+  lastNotifiedVersion = result.latestVersion
+  const options: Electron.MessageBoxOptions = {
+    type: 'info',
+    title: '发现新版本',
+    message: `DeepSeek Harness Station ${result.latestVersion} 已发布`,
+    detail: `当前版本：${result.currentVersion}\n最新版本：${result.latestVersion}\n\n是否打开下载页面？`,
+    buttons: ['下载更新', '稍后提醒'],
+    defaultId: 0,
+    cancelId: 1,
+    noLink: true,
+  }
+  const response = window === undefined || window.isDestroyed()
+    ? await dialog.showMessageBox(options)
+    : await dialog.showMessageBox(window, options)
+  if (response.response === 0) await shell.openExternal(result.releaseUrl)
+}
+
+async function runUpdateCheck(manual = false): Promise<void> {
+  if (checkingForUpdate) return
+  checkingForUpdate = true
+  try {
+    await showUpdateResult(await checkForUpdate(app.getVersion()), manual)
+  } catch (cause: unknown) {
+    console.warn(`deepseek-harness-station: update check failed: ${cause instanceof Error ? cause.message : String(cause)}`)
+    if (manual) {
+      const detail = cause instanceof Error ? cause.message : String(cause)
+      await dialog.showMessageBox({
+        type: 'warning',
+        title: '检查更新失败',
+        message: '暂时无法获取最新版本',
+        detail,
+        buttons: ['确定'],
+      })
+    }
+  } finally {
+    checkingForUpdate = false
+  }
+}
+
+function scheduleUpdateChecks(): void {
+  const initial = setTimeout(() => { void runUpdateCheck() }, initialUpdateCheckDelayMs)
+  const periodic = setInterval(() => { void runUpdateCheck() }, updateCheckIntervalMs)
+  initial.unref()
+  periodic.unref()
+}
+
 function createTray(): void {
   const source = nativeImage.createFromPath(applicationIconPath())
   const icon = process.platform === 'darwin' ? source.resize({ width: 22, height: 22 }) : source
@@ -132,6 +197,7 @@ function createTray(): void {
       label: '重新启动 Harness Host',
       click: () => { void restartHost() },
     },
+    { label: '检查更新', click: () => { void runUpdateCheck(true) } },
     { type: 'separator' },
     { label: '退出', click: () => { void quit() } },
   ]))
@@ -195,6 +261,7 @@ async function launch(): Promise<void> {
   })
   if (smokeFile === undefined) createTray()
   const origin = await startAndLoad()
+  if (smokeFile === undefined) scheduleUpdateChecks()
   if (smokeFile !== undefined) {
     writeFileSync(smokeFile, `${JSON.stringify({ ok: true, origin, packaged: app.isPackaged })}\n`, 'utf8')
     if (Number.isFinite(smokeHoldMs) && smokeHoldMs > 0) {

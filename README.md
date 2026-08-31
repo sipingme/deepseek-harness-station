@@ -41,7 +41,7 @@ corepack pnpm dist:win
 
 The pipeline performs type checking, tests, compilation, icon and third-party notice generation, ASAR/physical Host closure checks, packaged launch and single-instance smoke tests, NSIS creation, and PE verification. The installer is written to `dist/DeepSeek-Harness-Station-<version>-x64-Setup.exe`.
 
-The desktop build now includes a generation-isolated Node Host, the standard `web` profile, a sandboxed loopback renderer, single-instance refocus, tray controls for open/restart/quit, bounded startup, process-tree cleanup, bounded crash recovery, and a per-user NSIS installer/uninstaller with a selectable destination.
+The desktop build now includes a generation-isolated Node Host, the standard `web` profile, a sandboxed loopback renderer, single-instance refocus, tray controls for open/restart/check for updates/quit, update checks at startup and every six hours, bounded startup, process-tree cleanup, bounded crash recovery, and a per-user NSIS installer/uninstaller with a selectable destination.
 
 Credentials, Harness profiles, and plugins retain their `$DSH_HOME` behavior. Temporary Host roots live under `$DSH_HOME/profiles/web/.station-generations`, preserving profile plugin resolution while keeping each generation isolated, and are removed after shutdown. Uninstall preserves user data by default.
 
@@ -63,6 +63,6 @@ GitLab runs the equivalent `.gitlab-ci.yml` pipeline for the default branch, tag
 
 ## Project status
 
-This is pre-release software. The current packages are not signed or notarized: Windows may show an unknown-publisher warning and macOS may require an explicit Open action. Configure Authenticode and Apple Developer ID signing/notarization before public distribution. Automatic updates require a release feed and are not enabled.
+This is pre-release software. The current packages are not signed or notarized: Windows may show an unknown-publisher warning and macOS may require an explicit Open action. Configure Authenticode and Apple Developer ID signing/notarization before public distribution. The app prompts for versions declared on the GitHub main branch and opens the internal GitLab Release download page; it does not silently download or install updates.
 
 DeepSeek Harness Station is an independent community project built on DeepSeek Harness. It is not affiliated with or endorsed by DeepSeek.

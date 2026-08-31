@@ -41,7 +41,7 @@ corepack pnpm dist:win
 
 流水线会依次完成类型检查、测试、构建、图标与第三方许可证声明生成、ASAR/物理 Host 闭包检查、成品启动与单实例冒烟、NSIS 安装器生成和 PE 校验。安装器输出到 `dist/DeepSeek-Harness-Station-<version>-x64-Setup.exe`。
 
-当前桌面版本包含：独立且按 generation 隔离的 Node Host、标准 `web` 配置档案、沙箱化回环 Renderer、单实例重新聚焦、系统托盘打开/重启 Host/退出、启动超时、进程树清理、有限次数的崩溃自动恢复，以及可选择安装目录的按用户 NSIS 安装/卸载。
+当前桌面版本包含：独立且按 generation 隔离的 Node Host、标准 `web` 配置档案、沙箱化回环 Renderer、单实例重新聚焦、系统托盘打开/重启 Host/检查更新/退出、启动和每 6 小时自动检查新版、启动超时、进程树清理、有限次数的崩溃自动恢复，以及可选择安装目录的按用户 NSIS 安装/卸载。
 
 用户凭据、Harness 配置档案和插件继续保存在 `$DSH_HOME`；临时 Host 根配置位于 `$DSH_HOME/profiles/web/.station-generations`，这样既保持每代隔离，也保留 Harness 的 profile 插件解析链，退出后会自动清理。卸载默认保留用户数据。
 
@@ -63,6 +63,6 @@ GitLab 会在默认分支、标签和手动启动流水线时运行等价的 `.g
 
 ## 项目状态
 
-这是预发布软件。当前安装包尚未签名或公证：Windows 可能显示“未知发布者”，macOS 可能需要通过右键“打开”确认运行。正式外部分发前应配置 Authenticode、Apple Developer ID 签名与 notarization。自动更新需要发布服务器，尚未启用。
+这是预发布软件。当前安装包尚未签名或公证：Windows 可能显示“未知发布者”，macOS 可能需要通过右键“打开”确认运行。正式外部分发前应配置 Authenticode、Apple Developer ID 签名与 notarization。应用会提示 GitHub 主分支中声明的新版本，并打开内部 GitLab Release 下载页；目前不会在后台静默下载或安装更新。
 
 DeepSeek Harness Station 是基于 DeepSeek Harness 构建的独立社区项目，与 DeepSeek 没有隶属或背书关系。
