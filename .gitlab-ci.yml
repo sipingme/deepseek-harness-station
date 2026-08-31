@@ -37,6 +37,14 @@ windows-x64:
     GIT_CONFIG_COUNT: "1"
     GIT_CONFIG_KEY_0: "core.longpaths"
     GIT_CONFIG_VALUE_0: "true"
+  before_script:
+    - node --version
+    - New-Item -ItemType Directory -Force -Path .corepack | Out-Null
+    - corepack enable --install-directory .corepack
+    - $env:PATH = "$(Resolve-Path .corepack);$env:PATH"
+    - pnpm --version
+    - pnpm config set store-dir .pnpm-store
+    - pnpm install --frozen-lockfile
   tags:
     - windows
     - x64
