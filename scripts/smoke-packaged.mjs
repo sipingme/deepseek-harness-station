@@ -61,7 +61,11 @@ try {
   const earlyExit = new Promise((_resolveExit, rejectExit) => {
     first.once('exit', (code, signal) => rejectExit(new Error(`Packaged app exited before readiness (${code ?? signal ?? 'unknown'})`)))
   })
-  const result = JSON.parse(await Promise.race([waitForFile(resultFile, 90_000), earlyExit]))
+  // A cold LocalSystem runner can spend more than 90 seconds starting the
+  // packaged host for the first time (native modules and Windows Defender are
+  // both involved). Keep the smoke test strict, but allow enough startup time
+  // to avoid failing a healthy build at the previous timeout boundary.
+  const result = JSON.parse(await Promise.race([waitForFile(resultFile, 180_000), earlyExit]))
   if (result.ok !== true || result.packaged !== true || !String(result.origin).startsWith('http://127.0.0.1:')) {
     throw new Error(`Invalid packaged readiness result: ${JSON.stringify(result)}`)
   }
