@@ -24,6 +24,10 @@ extraResources:
   - from: build-resources/runtime-package.json
     to: app.asar.unpacked/package.json
 win:
+  electronLanguages:
+    - en-US
+    - zh-CN
+    - zh-TW
   target:
     - target: nsis
       arch:

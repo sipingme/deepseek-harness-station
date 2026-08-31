@@ -51,12 +51,14 @@ windows-x64:
   script:
     - corepack pnpm dist:win
     - corepack pnpm smoke:installer
+    - .\scripts\publish-gitlab-package.ps1
   artifacts:
     name: "DeepSeek-Harness-Station-Windows-x64-${CI_COMMIT_SHORT_SHA}"
     expire_in: 14 days
     paths:
-      - dist/DeepSeek-Harness-Station-*-x64-Setup.exe
       - dist/DeepSeek-Harness-Station-*-x64-Setup.exe.blockmap
+      - dist/SHA256SUMS.txt
+      - dist/PACKAGE.txt
 
 macos-x64:
   extends: .package
