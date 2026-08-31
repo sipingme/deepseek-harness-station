@@ -7,6 +7,7 @@ describe('application update checks', () => {
     expect(compareVersions('1.0.0', '1.0.0-rc.2')).toBeGreaterThan(0)
     expect(compareVersions('1.0.0-rc.10', '1.0.0-rc.2')).toBeGreaterThan(0)
     expect(compareVersions('v1.2.3', '1.2.3')).toBe(0)
+    expect(compareVersions('0.26.9-beta.0', '0.1.3')).toBeGreaterThan(0)
   })
 
   it('builds a trusted release URL when a newer version exists', async () => {
