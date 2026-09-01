@@ -55,4 +55,5 @@ await run('Verify packaged runtime closure', process.execPath, ['scripts/verify-
 await run('Smoke packaged application', process.execPath, ['scripts/smoke-packaged.mjs'])
 await run('Create NSIS installer', corepack, pnpmArgs(['exec', 'electron-builder', '--win', 'nsis', '--x64', '--publish', 'never']))
 await run('Verify NSIS installer', process.execPath, ['scripts/verify-win-installer.mjs'])
+await run('Write installer checksum', process.execPath, ['scripts/write-checksums.mjs'])
 console.log('\nDeepSeek Harness Station Windows distribution completed successfully.')

@@ -1,9 +1,9 @@
-/** Lightweight release checks for the Electron shell. */
+/** Release checks for the Electron shell backed by published GitHub Release assets. */
 
 export const UPDATE_METADATA_URL =
-  'https://raw.githubusercontent.com/sipingme/deepseek-harness-station/main/package.json'
+  'https://api.github.com/repos/sipingme/deepseek-harness-station/releases?per_page=20'
 export const RELEASES_BASE_URL =
-  'https://172.16.2.16/development/deepseek-harness-station/-/releases'
+  'https://github.com/sipingme/deepseek-harness-station/releases'
 
 const requestTimeoutMs = 15_000
 
@@ -14,10 +14,25 @@ type Version = {
   prerelease: string[]
 }
 
+type ReleaseAsset = {
+  name: string
+  browser_download_url: string
+}
+
+type ReleaseMetadata = {
+  tag_name: string
+  html_url: string
+  draft?: boolean
+  assets?: ReleaseAsset[]
+}
+
 export type UpdateCheckResult = {
   currentVersion: string
   latestVersion: string
   releaseUrl: string
+  installerFilename: string
+  installerUrl: string
+  checksumUrl: string
   updateAvailable: boolean
 }
 
@@ -63,27 +78,64 @@ export function compareVersions(leftValue: string, rightValue: string): number {
   return 0
 }
 
+function trustedGithubUrl(value: string, expectedPathPrefix: string): string | undefined {
+  try {
+    const url = new URL(value)
+    if (url.protocol !== 'https:' || url.hostname !== 'github.com') return undefined
+    return url.pathname.startsWith(expectedPathPrefix) ? url.href : undefined
+  } catch {
+    return undefined
+  }
+}
+
+function releaseCandidate(metadata: ReleaseMetadata): Omit<UpdateCheckResult, 'currentVersion' | 'updateAvailable'> | undefined {
+  if (metadata.draft === true || !Array.isArray(metadata.assets)) return undefined
+  const latestVersion = metadata.tag_name.trim().replace(/^v/, '')
+  try {
+    parseVersion(latestVersion)
+  } catch {
+    return undefined
+  }
+  const installerFilename = `DeepSeek-Harness-Station-${latestVersion}-x64-Setup.exe`
+  const installer = metadata.assets.find(asset => asset.name === installerFilename)
+  const checksum = metadata.assets.find(asset => asset.name === 'SHA256SUMS.txt')
+  const pathPrefix = '/sipingme/deepseek-harness-station/'
+  const releaseUrl = trustedGithubUrl(metadata.html_url, `${pathPrefix}releases/`)
+  const installerUrl = installer === undefined
+    ? undefined
+    : trustedGithubUrl(installer.browser_download_url, `${pathPrefix}releases/download/`)
+  const checksumUrl = checksum === undefined
+    ? undefined
+    : trustedGithubUrl(checksum.browser_download_url, `${pathPrefix}releases/download/`)
+  if (releaseUrl === undefined || installerUrl === undefined || checksumUrl === undefined) return undefined
+  return { latestVersion, releaseUrl, installerFilename, installerUrl, checksumUrl }
+}
+
 export async function checkForUpdate(
   currentVersion: string,
   fetchLatest: typeof fetch = fetch,
 ): Promise<UpdateCheckResult> {
+  parseVersion(currentVersion)
   const response = await fetchLatest(UPDATE_METADATA_URL, {
-    headers: { accept: 'application/json' },
+    headers: {
+      accept: 'application/vnd.github+json',
+      'x-github-api-version': '2022-11-28',
+    },
     cache: 'no-store',
     signal: AbortSignal.timeout(requestTimeoutMs),
   })
   if (!response.ok) throw new Error(`Update server returned HTTP ${response.status}`)
   const metadata: unknown = await response.json()
-  if (metadata === null || typeof metadata !== 'object' || !('version' in metadata)
-    || typeof metadata.version !== 'string') {
-    throw new Error('Update metadata does not contain a version')
-  }
-  const latestVersion = metadata.version.trim()
-  const updateAvailable = compareVersions(latestVersion, currentVersion) > 0
+  if (!Array.isArray(metadata)) throw new Error('Update metadata does not contain a release list')
+  const candidates = metadata
+    .map(item => item !== null && typeof item === 'object' ? releaseCandidate(item as ReleaseMetadata) : undefined)
+    .filter(candidate => candidate !== undefined)
+    .sort((left, right) => compareVersions(right.latestVersion, left.latestVersion))
+  const latest = candidates[0]
+  if (latest === undefined) throw new Error('尚未发布可自动升级的 Windows 安装包')
   return {
     currentVersion,
-    latestVersion,
-    releaseUrl: `${RELEASES_BASE_URL}/v${encodeURIComponent(latestVersion)}`,
-    updateAvailable,
+    ...latest,
+    updateAvailable: compareVersions(latest.latestVersion, currentVersion) > 0,
   }
 }

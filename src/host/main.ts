@@ -82,7 +82,7 @@ async function bootHost(command: StartHostCommand): Promise<Context> {
   return await boot(NAME, profile.root, profile.patches, (ctx) => {
     ctx.provide(DSH_LAUNCH_ENVIRONMENT_KEY, environment)
     provideCmdline(ctx, {
-      args: ['--host', '127.0.0.1', '--port', '0'],
+      args: ['--host', '127.0.0.1', '--port', '0', '--no-open'],
       exit: () => { void ctx.fiber.dispose() },
     })
   }, pathToFileURL(profile.anchor).href)

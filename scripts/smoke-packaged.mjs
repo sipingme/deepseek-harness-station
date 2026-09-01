@@ -78,6 +78,9 @@ try {
   const secondResult = await waitForFile(secondFile, 15_000)
   if (secondResult.trim() !== 'focused') throw new Error('Second instance did not focus the existing window')
   await waitForExit(first, 30_000)
+  if (/opening the default browser/i.test(logs)) {
+    throw new Error('Packaged app attempted to open the Harness URL in the default browser')
+  }
 
   const generations = join(dshHome, 'profiles', 'web', '.station-generations')
   const leftovers = await readdir(generations).catch(() => [])

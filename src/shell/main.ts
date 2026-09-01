@@ -1,11 +1,14 @@
 /** DeepSeek Harness Station Electron shell: native UI and Host supervision only. */
 
+import { spawn } from 'node:child_process'
 import { writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { app, BrowserWindow, dialog, Menu, nativeImage, shell, Tray } from 'electron'
 import { resolveDshHome } from '@deepseek-ai/dsh-home-paths'
 import { HostSupervisor, type UnexpectedHostExit } from './supervisor.js'
 import { generationWorkRoot } from './paths.js'
+import { downloadVerifiedInstaller } from './installer-updater.js'
+import { classifyWindowOpen } from './navigation-policy.js'
 import { checkForUpdate, type UpdateCheckResult } from './update-checker.js'
 
 const PRODUCT_NAME = 'DeepSeek Harness Station'
@@ -69,13 +72,11 @@ function createWindow(origin: string): BrowserWindow {
     }
   })
   browserWindow.webContents.setWindowOpenHandler(({ url }) => {
-    try {
-      const target = new URL(url)
-      if (target.protocol === 'https:' || target.protocol === 'http:' || target.protocol === 'mailto:') {
-        void shell.openExternal(target.href)
-      }
-    } catch {
-      // Malformed targets remain denied.
+    const disposition = classifyWindowOpen(trustedOrigin, url)
+    if (disposition === 'internal') {
+      if (url !== browserWindow.webContents.getURL()) void browserWindow.loadURL(url)
+    } else if (disposition === 'external') {
+      void shell.openExternal(url)
     }
     return { action: 'deny' }
   })
@@ -145,16 +146,77 @@ async function showUpdateResult(result: UpdateCheckResult, manual: boolean): Pro
     type: 'info',
     title: '发现新版本',
     message: `DeepSeek Harness Station ${result.latestVersion} 已发布`,
-    detail: `当前版本：${result.currentVersion}\n最新版本：${result.latestVersion}\n\n是否打开下载页面？`,
-    buttons: ['下载更新', '稍后提醒'],
+    detail: `当前版本：${result.currentVersion}\n最新版本：${result.latestVersion}\n\n安装前会下载并校验官方发布包。`,
+    buttons: ['立即升级', '查看版本说明', '稍后提醒'],
     defaultId: 0,
-    cancelId: 1,
+    cancelId: 2,
     noLink: true,
   }
   const response = window === undefined || window.isDestroyed()
     ? await dialog.showMessageBox(options)
     : await dialog.showMessageBox(window, options)
-  if (response.response === 0) await shell.openExternal(result.releaseUrl)
+  if (response.response === 0) await downloadAndInstallUpdate(result)
+  else if (response.response === 1) await shell.openExternal(result.releaseUrl)
+}
+
+async function downloadAndInstallUpdate(result: UpdateCheckResult): Promise<void> {
+  if (process.platform !== 'win32' || !app.isPackaged) {
+    await dialog.showMessageBox({
+      type: 'info',
+      title: '下载更新',
+      message: '当前环境不支持自动安装',
+      detail: app.isPackaged ? '请从版本发布页下载安装包。' : '开发模式不会覆盖本地源码，请从安装版中测试自动升级。',
+      buttons: ['打开版本发布页', '取消'],
+      defaultId: 0,
+      cancelId: 1,
+    }).then(async response => {
+      if (response.response === 0) await shell.openExternal(result.releaseUrl)
+    })
+    return
+  }
+  const targetWindow = window !== undefined && !window.isDestroyed() ? window : undefined
+  targetWindow?.setProgressBar(2)
+  tray?.setToolTip(`${PRODUCT_NAME} · 正在下载 ${result.latestVersion}`)
+  try {
+    const installerPath = await downloadVerifiedInstaller(result, {
+      downloadDirectory: join(app.getPath('temp'), 'deepseek-harness-station-updates', result.latestVersion),
+      onProgress: progress => {
+        if (progress.totalBytes !== undefined) {
+          targetWindow?.setProgressBar(progress.receivedBytes / progress.totalBytes)
+        }
+      },
+    })
+    targetWindow?.setProgressBar(-1)
+    const ready = await dialog.showMessageBox({
+      type: 'info',
+      title: '更新已准备完成',
+      message: `DeepSeek Harness Station ${result.latestVersion} 已下载并通过校验`,
+      detail: '点击“安装并重启”后，当前 App 会退出并启动安装程序。',
+      buttons: ['安装并重启', '稍后安装'],
+      defaultId: 0,
+      cancelId: 1,
+      noLink: true,
+    })
+    if (ready.response !== 0) return
+    const installer = spawn(installerPath, [], {
+      detached: true,
+      stdio: 'ignore',
+      windowsHide: false,
+    })
+    installer.unref()
+    await quit()
+  } catch (cause: unknown) {
+    targetWindow?.setProgressBar(-1)
+    await dialog.showMessageBox({
+      type: 'error',
+      title: '升级失败',
+      message: '新版本下载或校验失败',
+      detail: cause instanceof Error ? cause.message : String(cause),
+      buttons: ['确定'],
+    })
+  } finally {
+    if (!quitting) tray?.setToolTip(PRODUCT_NAME)
+  }
 }
 
 async function runUpdateCheck(manual = false): Promise<void> {
@@ -193,6 +255,7 @@ function createTray(): void {
   tray.setToolTip(PRODUCT_NAME)
   tray.setContextMenu(Menu.buildFromTemplate([
     { label: '打开 DeepSeek Harness Station', click: showWindow },
+    { label: `当前版本 ${app.getVersion()}`, enabled: false },
     {
       label: '重新启动 Harness Host',
       click: () => { void restartHost() },
@@ -202,6 +265,51 @@ function createTray(): void {
     { label: '退出', click: () => { void quit() } },
   ]))
   tray.on('double-click', showWindow)
+}
+
+function createApplicationMenu(): void {
+  Menu.setApplicationMenu(Menu.buildFromTemplate([
+    {
+      label: '应用',
+      submenu: [
+        { label: '打开主窗口', click: showWindow },
+        { label: '重新启动 Harness Host', click: () => { void restartHost() } },
+        { type: 'separator' },
+        { role: 'quit', label: '退出' },
+      ],
+    },
+    {
+      label: '编辑',
+      submenu: [
+        { role: 'undo', label: '撤销' },
+        { role: 'redo', label: '重做' },
+        { type: 'separator' },
+        { role: 'cut', label: '剪切' },
+        { role: 'copy', label: '复制' },
+        { role: 'paste', label: '粘贴' },
+        { role: 'selectAll', label: '全选' },
+      ],
+    },
+    {
+      label: '视图',
+      submenu: [
+        { role: 'reload', label: '重新加载页面' },
+        { role: 'resetZoom', label: '重置缩放' },
+        { role: 'zoomIn', label: '放大' },
+        { role: 'zoomOut', label: '缩小' },
+        { type: 'separator' },
+        { role: 'togglefullscreen', label: '切换全屏' },
+      ],
+    },
+    {
+      label: '帮助',
+      submenu: [
+        { label: `当前版本 ${app.getVersion()}`, enabled: false },
+        { label: '检查更新…', click: () => { void runUpdateCheck(true) } },
+        { label: '版本发布页', click: () => { void shell.openExternal('https://github.com/sipingme/deepseek-harness-station/releases') } },
+      ],
+    },
+  ]))
 }
 
 async function restartHost(): Promise<void> {
@@ -259,7 +367,10 @@ async function launch(): Promise<void> {
     pickDirectory: pickWorkspaceDirectory,
     onUnexpectedExit: event => { void recoverHost(event) },
   })
-  if (smokeFile === undefined) createTray()
+  if (smokeFile === undefined) {
+    createApplicationMenu()
+    createTray()
+  }
   const origin = await startAndLoad()
   if (smokeFile === undefined) scheduleUpdateChecks()
   if (smokeFile !== undefined) {
