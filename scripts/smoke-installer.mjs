@@ -37,7 +37,7 @@ function verifyLinks(snapshot, uninstaller) {
       throw new Error(`Missing or incorrect application shortcut/icon: ${path}; state=${JSON.stringify(snapshot)}`)
     }
   }
-  if (!snapshot.shortcuts.some(link => samePath(link.target, uninstaller))) throw new Error('Start menu uninstaller shortcut is missing')
+  if (!snapshot.shortcuts.some(link => samePath(link.target, uninstaller))) throw new Error(`Start menu uninstaller shortcut is missing: expected=${uninstaller}; state=${JSON.stringify(snapshot)}`)
   if (snapshot.registrations.length !== 1 || !snapshot.registrations[0].UninstallString.includes(uninstaller)) {
     throw new Error('Windows installed-apps uninstall registration is missing or incorrect')
   }
