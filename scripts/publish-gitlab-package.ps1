@@ -56,7 +56,7 @@ if ($env:CI_COMMIT_TAG) {
   $notesPath = "docs/release-$version.zh-CN.md"
   $notes = if (Test-Path -LiteralPath $notesPath) { Get-Content -LiteralPath $notesPath -Raw -Encoding utf8 } else { "DeepSeek Harness Station $version" }
   $installerUrl = "$packageBaseUrl/$([Uri]::EscapeDataString($installer.Name))"
-  $notes = "[点击直接下载安装包]($installerUrl)`n`n$notes"
+  $notes = "[Download Windows installer]($installerUrl)`n`n$notes"
   $existing = $null
   try {
     $existing = Invoke-RestMethod -Uri $releaseUrl -Headers $headers
