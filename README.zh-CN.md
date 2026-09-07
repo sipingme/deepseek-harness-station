@@ -45,7 +45,9 @@ corepack pnpm dist:win
 
 用户凭据、Harness 配置档案和插件继续保存在 `$DSH_HOME`；临时 Host 根配置位于 `$DSH_HOME/profiles/web/.station-generations`，这样既保持每代隔离，也保留 Harness 的 profile 插件解析链，退出后会自动清理。卸载默认保留用户数据。
 
-Station `0.26.9-beta.2` 内置 Harness `0.1.2-rc.1`。更新提示提供应用内安装和手动下载入口；GitHub API 检查失败时会尝试 Release Atom 订阅源。旧用户通知条件和发布步骤见 [升级说明](docs/release-0.26.9-beta.2.zh-CN.md)。
+Station 内置 Harness `0.1.2-rc.1`。更新提示点击“立即下载”后由 App 下载并校验安装包；GitHub API 检查失败时会尝试 Release Atom 订阅源。旧用户通知条件和发布步骤见 [升级说明](docs/release-0.26.9-beta.2.zh-CN.md)。
+
+Windows 安装器直接解压到目标目录，安装后创建桌面图标及开始菜单中的应用和卸载入口。“应用”菜单还提供“创建桌面快捷方式”和“卸载应用…”。卸载保留会话、配置和工作区文件。安装、重装与卸载测试仅允许在没有已有安装的 CI Windows 账户执行，耗时记录在 `dist/installer-timings.json`。
 
 ## macOS 安装包
 
@@ -61,7 +63,7 @@ macOS 流水线会为当前架构生成并校验 DMG、ZIP；GitHub Actions 分�
 
 每次推送到 `main`、版本标签，或手动运行 workflow 时，`.github/workflows/build-desktop.yml` 都会启动。Windows job 上传经过验证的 x64 NSIS 安装器；版本标签还会发布包含安装包与 `SHA256SUMS.txt` 的 GitHub Release，供客户端检测并升级。macOS job 上传 x64、arm64 两套 DMG 和 ZIP。构建产物在 GitHub Actions 中保留 14 天。
 
-GitLab 会在默认分支、标签和手动启动流水线时运行等价的 `.gitlab-ci.yml`。三类原生 Shell Runner 需要预装 Node.js 24 与 Corepack，并分别带有 `windows` + `x64`、`macos` + `x64`、`macos` + `arm64` 标签组合。通过校验的 EXE、blockmap、DMG 和 ZIP 会作为流水线产物保留 14 天。
+GitLab 会在默认分支、标签和手动启动流水线时运行 `.gitlab-ci.yml` 的 Windows 构建。原生 Shell Runner 需要预装 Node.js 24 与 Corepack，并带有 `windows` + `x64` 标签。通过校验的 EXE 和 SHA-256 文件上传至 Package Registry，版本标签会自动创建带直接下载入口的 Release；校验文件、下载说明和安装耗时作为小型流水线附件保留 14 天。
 
 ## 项目状态
 
