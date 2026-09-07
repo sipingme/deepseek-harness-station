@@ -1,5 +1,5 @@
 /** Version of the private Station Shell-to-Host lifecycle protocol. */
-export const STATION_PROTOCOL_VERSION = 1
+export const STATION_PROTOCOL_VERSION = 2
 
 /** Shell-owned configuration sent once to a newly spawned Host. */
 export interface StartHostCommand {
@@ -36,6 +36,7 @@ export interface HostReadyEvent {
   readonly protocolVersion: number
   readonly generationId: string
   readonly origin: string
+  readonly launchUrl: string
 }
 
 /** Structured Host startup or runtime failure. */
@@ -108,11 +109,17 @@ export function parseHostMessage(value: unknown): HostToShellMessage | undefined
   if (!record(value) || typeof value.type !== 'string' || typeof value.generationId !== 'string') return undefined
   if (value.type === 'ready'
     && value.protocolVersion === STATION_PROTOCOL_VERSION
-    && typeof value.origin === 'string') {
+    && typeof value.origin === 'string'
+    && typeof value.launchUrl === 'string') {
     try {
       const origin = new URL(value.origin)
       if (origin.protocol !== 'http:' || origin.hostname !== '127.0.0.1' || origin.origin !== value.origin) return undefined
-      return { type: 'ready', protocolVersion: STATION_PROTOCOL_VERSION, generationId: value.generationId, origin: value.origin }
+      const launchUrl = new URL(value.launchUrl)
+      if (launchUrl.origin !== origin.origin || launchUrl.username !== '' || launchUrl.password !== ''
+        || launchUrl.pathname !== '/' || launchUrl.hash !== ''
+        || [...launchUrl.searchParams.keys()].join(',') !== 'token'
+        || !/^[A-Za-z0-9_-]{32,128}$/.test(launchUrl.searchParams.get('token') ?? '')) return undefined
+      return { type: 'ready', protocolVersion: STATION_PROTOCOL_VERSION, generationId: value.generationId, origin: value.origin, launchUrl: launchUrl.href }
     } catch {
       return undefined
     }

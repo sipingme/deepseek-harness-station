@@ -1,4 +1,4 @@
-import { mkdir, readFile, readdir, rm } from 'node:fs/promises'
+import { mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { spawn } from 'node:child_process'
 import { dirname, join, resolve } from 'node:path'
 import { tmpdir } from 'node:os'
@@ -46,6 +46,25 @@ function waitForExit(child, timeoutMs) {
 let first
 let logs = ''
 try {
+  const previousApp = process.argv[2]
+  const preservedConfig = '# Station upgrade smoke fixture\nSTATION_UPGRADE_FIXTURE=preserved\n'
+  if (previousApp !== undefined) {
+    await mkdir(dshHome, { recursive: true })
+    await writeFile(join(dshHome, '.env'), preservedConfig)
+    await writeFile(join(dshHome, 'cordis.patch.yml'), '[]\n')
+    first = spawn(resolve(previousApp), [`--user-data-dir=${userData}`], {
+      env: { ...process.env, DSH_HOME: dshHome, STATION_SMOKE_FILE: join(smokeRoot, 'previous.json'), STATION_SMOKE_HOLD_MS: '0' },
+      stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true,
+    })
+    first.stdout.on('data', chunk => { logs += chunk.toString() })
+    first.stderr.on('data', chunk => { logs += chunk.toString() })
+    await waitForExit(first, 180_000)
+    const previous = JSON.parse(await readFile(join(smokeRoot, 'previous.json'), 'utf8'))
+    if (previous.ok !== true || previous.packaged !== true) throw new Error('Previous version did not boot')
+    // The old application may have different browser-opening behavior. The
+    // no-external-browser assertion below belongs to the new application.
+    logs = ''
+  }
   first = spawn(executable, [`--user-data-dir=${userData}`], {
     env: {
       ...process.env,
@@ -85,6 +104,13 @@ try {
   const generations = join(dshHome, 'profiles', 'web', '.station-generations')
   const leftovers = await readdir(generations).catch(() => [])
   if (leftovers.length !== 0) throw new Error(`Host generation cleanup left ${leftovers.length} directories`)
+  if (previousApp !== undefined) {
+    if (await readFile(join(dshHome, '.env'), 'utf8') !== preservedConfig
+      || await readFile(join(dshHome, 'cordis.patch.yml'), 'utf8') !== '[]\n') {
+      throw new Error('Upgrade changed user configuration')
+    }
+    console.log('Upgrade smoke passed: previous and new packaged apps booted with the same home; user configuration preserved')
+  }
   console.log('Packaged smoke passed: Host ready, renderer loaded, second instance focused, clean shutdown verified')
 } finally {
   if (first !== undefined && first.exitCode === null) {
@@ -92,5 +118,5 @@ try {
     await new Promise(resolveKill => killer.once('exit', resolveKill))
   }
   await rm(smokeRoot, { recursive: true, force: true, maxRetries: 6, retryDelay: 250 }).catch(() => undefined)
-  if (logs.trim() !== '') console.error(logs.trim())
+  if (logs.trim() !== '') console.error(logs.trim().replace(/([?&]token=)[A-Za-z0-9_-]+/g, '$1[redacted]'))
 }

@@ -37,6 +37,7 @@ describe('Station lifecycle protocol', () => {
       protocolVersion: STATION_PROTOCOL_VERSION,
       generationId: 'generation-1',
       origin: 'http://127.0.0.1:43125',
+      launchUrl: `http://127.0.0.1:43125/?token=${'a'.repeat(43)}`,
     })?.type).toBe('ready')
     expect(parseHostMessage({
       type: 'ready',
@@ -44,6 +45,18 @@ describe('Station lifecycle protocol', () => {
       generationId: 'generation-1',
       origin: 'https://example.com',
     })).toBeUndefined()
+  })
+
+  it('rejects launch credentials for a different origin or unexpected navigation', () => {
+    for (const launchUrl of [
+      `http://127.0.0.1:43126/?token=${'a'.repeat(43)}`,
+      `https://example.com/?token=${'a'.repeat(43)}`,
+      'http://127.0.0.1:43125/',
+      `http://127.0.0.1:43125/?token=${'a'.repeat(43)}&next=https://example.com`,
+    ]) {
+      expect(parseHostMessage({ type: 'ready', protocolVersion: STATION_PROTOCOL_VERSION,
+        generationId: 'generation-1', origin: 'http://127.0.0.1:43125', launchUrl })).toBeUndefined()
+    }
   })
 
   it('validates native directory picker IPC in both directions', () => {

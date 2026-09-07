@@ -9,7 +9,7 @@ import { HostSupervisor, type UnexpectedHostExit } from './supervisor.js'
 import { generationWorkRoot } from './paths.js'
 import { downloadVerifiedInstaller } from './installer-updater.js'
 import { classifyWindowOpen } from './navigation-policy.js'
-import { checkForUpdate, type UpdateCheckResult } from './update-checker.js'
+import { checkForUpdate, RELEASES_BASE_URL, type UpdateCheckResult } from './update-checker.js'
 
 const PRODUCT_NAME = 'DeepSeek Harness Station'
 const smokeFile = process.env.STATION_SMOKE_FILE
@@ -92,7 +92,7 @@ function createWindow(origin: string): BrowserWindow {
 async function startAndLoad(): Promise<string> {
   const ready = await supervisor.start('web')
   if (window === undefined || window.isDestroyed()) window = createWindow(ready.origin)
-  await window.loadURL(ready.origin)
+  await window.loadURL(ready.launchUrl)
   await window.webContents.executeJavaScript(`new Promise((resolve, reject) => {
     const started = Date.now()
     const check = () => {
@@ -146,8 +146,8 @@ async function showUpdateResult(result: UpdateCheckResult, manual: boolean): Pro
     type: 'info',
     title: '发现新版本',
     message: `DeepSeek Harness Station ${result.latestVersion} 已发布`,
-    detail: `当前版本：${result.currentVersion}\n最新版本：${result.latestVersion}\n\n安装前会下载并校验官方发布包。`,
-    buttons: ['立即升级', '查看版本说明', '稍后提醒'],
+    detail: `当前版本：${result.currentVersion}\n最新版本：${result.latestVersion}\n\n确认后下载并校验官方发布包，也可打开发布页手动下载安装。安装前请保存当前工作。`,
+    buttons: ['下载并安装', '手动下载 / 版本说明', '稍后提醒'],
     defaultId: 0,
     cancelId: 2,
     noLink: true,
@@ -232,8 +232,11 @@ async function runUpdateCheck(manual = false): Promise<void> {
         type: 'warning',
         title: '检查更新失败',
         message: '暂时无法获取最新版本',
-        detail,
-        buttons: ['确定'],
+        detail: `${detail}\n\n可以打开版本发布页，手动下载安装更新。`,
+        buttons: ['打开下载页面', '取消'],
+        cancelId: 1,
+      }).then(async response => {
+        if (response.response === 0) await shell.openExternal(RELEASES_BASE_URL)
       })
     }
   } finally {

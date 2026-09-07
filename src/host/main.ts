@@ -17,6 +17,7 @@ import { provideCmdline } from '@deepseek-ai/dsh-cmdline'
 import { resolveDshHome } from '@deepseek-ai/dsh-home-paths'
 import { DSH_LAUNCH_ENVIRONMENT_KEY } from '@deepseek-ai/dsh-launch-environment'
 import type {} from '@deepseek-ai/dsh-host-webserver'
+import type {} from '@deepseek-ai/dsh-client-connection'
 import {
   parseShellMessage,
   STATION_PROTOCOL_VERSION,
@@ -51,13 +52,13 @@ function installationAnchor(): string {
   return require.resolve('@deepseek-ai/dsh/package.json')
 }
 
-function composeProfile(
+async function composeProfile(
   command: StartHostCommand,
   environment: ReturnType<typeof loadLayeredEnv>,
-): { root: string; patches: PatchOptions[]; anchor: string } {
+): Promise<{ root: string; patches: PatchOptions[]; anchor: string }> {
   const anchor = installationAnchor()
-  healProfilesModuleFallback(anchor)
   const profile = loadProfile(NAME, command.profile, anchor)
+  await healProfilesModuleFallback({ installAnchor: anchor, profile })
   const homeLayer = loadOptionalPatches(NAME, join(resolveDshHome(), PROFILE_PATCH_FILENAME)) ?? []
   const lowerPatches = [
     ...profile.layers.flatMap(layer => layer.patches),
@@ -78,7 +79,7 @@ function composeProfile(
 
 async function bootHost(command: StartHostCommand): Promise<Context> {
   const environment = loadLayeredEnv(NAME)
-  const profile = composeProfile(command, environment)
+  const profile = await composeProfile(command, environment)
   return await boot(NAME, profile.root, profile.patches, (ctx) => {
     ctx.provide(DSH_LAUNCH_ENVIRONMENT_KEY, environment)
     provideCmdline(ctx, {
@@ -131,12 +132,19 @@ async function start(command: StartHostCommand): Promise<void> {
       await context.fiber.dispose()
       throw new Error('Web profile activated without the webServer service')
     }
+    const connection = context.get('connection')
+    if (connection === undefined) {
+      await context.fiber.dispose()
+      throw new Error('Web profile activated without the connection service')
+    }
+    const origin = `http://127.0.0.1:${String(webServer.port)}`
     active = { generationId: command.generationId, context }
     send({
       type: 'ready',
       protocolVersion: STATION_PROTOCOL_VERSION,
       generationId: command.generationId,
-      origin: `http://127.0.0.1:${String(webServer.port)}`,
+      origin,
+      launchUrl: connection.authenticatedUrl(origin),
     })
   } catch (cause: unknown) {
     send({

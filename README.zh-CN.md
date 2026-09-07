@@ -45,6 +45,8 @@ corepack pnpm dist:win
 
 用户凭据、Harness 配置档案和插件继续保存在 `$DSH_HOME`；临时 Host 根配置位于 `$DSH_HOME/profiles/web/.station-generations`，这样既保持每代隔离，也保留 Harness 的 profile 插件解析链，退出后会自动清理。卸载默认保留用户数据。
 
+Station `0.26.9-beta.2` 内置 Harness `0.1.2-rc.1`。更新提示提供应用内安装和手动下载入口；GitHub API 检查失败时会尝试 Release Atom 订阅源。旧用户通知条件和发布步骤见 [升级说明](docs/release-0.26.9-beta.2.zh-CN.md)。
+
 ## macOS 安装包
 
 在 macOS 上执行：

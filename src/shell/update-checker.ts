@@ -4,6 +4,7 @@ export const UPDATE_METADATA_URL =
   'https://api.github.com/repos/sipingme/deepseek-harness-station/releases?per_page=20'
 export const RELEASES_BASE_URL =
   'https://github.com/sipingme/deepseek-harness-station/releases'
+export const UPDATE_FEED_URL = `${RELEASES_BASE_URL}.atom`
 
 const requestTimeoutMs = 15_000
 
@@ -89,7 +90,7 @@ function trustedGithubUrl(value: string, expectedPathPrefix: string): string | u
 }
 
 function releaseCandidate(metadata: ReleaseMetadata): Omit<UpdateCheckResult, 'currentVersion' | 'updateAvailable'> | undefined {
-  if (metadata.draft === true || !Array.isArray(metadata.assets)) return undefined
+  if (typeof metadata.tag_name !== 'string' || metadata.draft === true || !Array.isArray(metadata.assets)) return undefined
   const latestVersion = metadata.tag_name.trim().replace(/^v/, '')
   try {
     parseVersion(latestVersion)
@@ -97,8 +98,8 @@ function releaseCandidate(metadata: ReleaseMetadata): Omit<UpdateCheckResult, 'c
     return undefined
   }
   const installerFilename = `DeepSeek-Harness-Station-${latestVersion}-x64-Setup.exe`
-  const installer = metadata.assets.find(asset => asset.name === installerFilename)
-  const checksum = metadata.assets.find(asset => asset.name === 'SHA256SUMS.txt')
+  const installer = metadata.assets.find(asset => asset?.name === installerFilename)
+  const checksum = metadata.assets.find(asset => asset?.name === 'SHA256SUMS.txt')
   const pathPrefix = '/sipingme/deepseek-harness-station/'
   const releaseUrl = trustedGithubUrl(metadata.html_url, `${pathPrefix}releases/`)
   const installerUrl = installer === undefined
@@ -111,7 +112,7 @@ function releaseCandidate(metadata: ReleaseMetadata): Omit<UpdateCheckResult, 'c
   return { latestVersion, releaseUrl, installerFilename, installerUrl, checksumUrl }
 }
 
-export async function checkForUpdate(
+async function checkApi(
   currentVersion: string,
   fetchLatest: typeof fetch = fetch,
 ): Promise<UpdateCheckResult> {
@@ -137,5 +138,43 @@ export async function checkForUpdate(
     currentVersion,
     ...latest,
     updateAvailable: compareVersions(latest.latestVersion, currentVersion) > 0,
+  }
+}
+
+/** The public Atom feed avoids the unauthenticated API's shared IP rate limit. */
+export async function checkForUpdate(
+  currentVersion: string,
+  fetchLatest: typeof fetch = fetch,
+): Promise<UpdateCheckResult> {
+  parseVersion(currentVersion)
+  try {
+    return await checkApi(currentVersion, fetchLatest)
+  } catch (apiError) {
+    try {
+      const response = await fetchLatest(UPDATE_FEED_URL, {
+        cache: 'no-store', signal: AbortSignal.timeout(requestTimeoutMs),
+      })
+      if (!response.ok) throw new Error(`Release feed returned HTTP ${response.status}`)
+      const feed = await response.text()
+      const tags = [...new Set([...feed.matchAll(/\/releases\/tag\/(v?\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)["<]/g)].map(match => match[1]!))]
+        .sort((left, right) => compareVersions(right, left)).slice(0, 20)
+      for (const tag of tags) {
+        const version = tag.replace(/^v/, '')
+        const base = `${RELEASES_BASE_URL}/download/${tag}`
+        const filenames = [`DeepSeek-Harness-Station-${version}-x64-Setup.exe`, 'SHA256SUMS.txt']
+        const assets = filenames.map(name => ({ name, browser_download_url: `${base}/${name}` }))
+        const checks = await Promise.all(assets.map(asset => fetchLatest(asset.browser_download_url, {
+          method: 'HEAD', cache: 'no-store', signal: AbortSignal.timeout(requestTimeoutMs),
+        })))
+        if (checks.some(check => !check.ok)) continue
+        const candidate = releaseCandidate({ tag_name: tag, html_url: `${RELEASES_BASE_URL}/tag/${tag}`, assets })
+        if (candidate !== undefined) return {
+          currentVersion, ...candidate, updateAvailable: compareVersions(version, currentVersion) > 0,
+        }
+      }
+      throw new Error('Release feed has no complete Windows release')
+    } catch {
+      throw apiError
+    }
   }
 }

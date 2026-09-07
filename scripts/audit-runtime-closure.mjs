@@ -20,7 +20,10 @@ export function auditRuntimeClosure(packagedModules) {
     const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
     if (closure.has(manifest.name)) continue
     closure.set(manifest.name, { version: manifest.version, manifestPath })
-    const names = [...Object.keys(manifest.dependencies ?? {}), ...Object.keys(manifest.peerDependencies ?? {})]
+    // Optional peers installed for development (for example Lexical's TypeScript
+    // peer) do not become mandatory production dependencies merely by resolving.
+    const names = [...Object.keys(manifest.dependencies ?? {}), ...Object.keys(manifest.peerDependencies ?? {})
+      .filter(name => manifest.peerDependenciesMeta?.[name]?.optional !== true)]
     for (const name of names) {
       if (closure.has(name)) continue
       const directory = packageDirFromAnchor(manifestPath, name)

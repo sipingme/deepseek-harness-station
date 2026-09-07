@@ -4,8 +4,11 @@ if (-not $env:CI_API_V4_URL -or -not $env:CI_PROJECT_ID -or -not $env:CI_JOB_TOK
   throw 'GitLab CI package publishing variables are unavailable'
 }
 
-$installer = Get-ChildItem -LiteralPath 'dist' -Filter 'DeepSeek-Harness-Station-*-x64-Setup.exe' -File |
-  Select-Object -First 1
+$version = (Get-Content -LiteralPath 'package.json' -Raw | ConvertFrom-Json).version
+if ($env:CI_COMMIT_TAG -and $env:CI_COMMIT_TAG -cne "v$version") {
+  throw 'Release tag must match package.json version'
+}
+$installer = Get-Item -LiteralPath "dist/DeepSeek-Harness-Station-$version-x64-Setup.exe"
 if (-not $installer) {
   throw 'Windows installer was not found in dist'
 }
