@@ -1,8 +1,10 @@
 /** DeepSeek Harness Station Electron shell: native UI and Host supervision only. */
 
 import { spawn } from 'node:child_process'
+import { once } from 'node:events'
+import { access } from 'node:fs/promises'
 import { writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { app, BrowserWindow, dialog, Menu, nativeImage, shell, Tray } from 'electron'
 import { resolveDshHome } from '@deepseek-ai/dsh-home-paths'
 import { HostSupervisor, type UnexpectedHostExit } from './supervisor.js'
@@ -12,6 +14,7 @@ import { classifyWindowOpen } from './navigation-policy.js'
 import { checkForUpdate, RELEASES_BASE_URL, type UpdateCheckResult } from './update-checker.js'
 
 const PRODUCT_NAME = 'DeepSeek Harness Station'
+const APP_ID = 'com.siping.deepseek-harness-station'
 const smokeFile = process.env.STATION_SMOKE_FILE
 const smokeHoldMs = Number(process.env.STATION_SMOKE_HOLD_MS ?? '0')
 const recoveryLimit = 3
@@ -250,6 +253,43 @@ function scheduleUpdateChecks(): void {
   periodic.unref()
 }
 
+async function createDesktopShortcut(): Promise<void> {
+  const ok = shell.writeShortcutLink(join(app.getPath('desktop'), `${PRODUCT_NAME}.lnk`), 'create', {
+    target: process.execPath,
+    cwd: dirname(process.execPath),
+    icon: process.execPath,
+    iconIndex: 0,
+    appUserModelId: APP_ID,
+    description: PRODUCT_NAME,
+  })
+  await dialog.showMessageBox({
+    type: ok ? 'info' : 'error', title: '桌面快捷方式',
+    message: ok ? '已创建桌面快捷方式' : '无法创建桌面快捷方式，请检查桌面目录是否可写。',
+    buttons: ['确定'],
+  })
+}
+
+async function uninstallApplication(): Promise<void> {
+  const response = await dialog.showMessageBox({
+    type: 'question', title: '卸载应用', message: `卸载 ${PRODUCT_NAME}？`,
+    detail: '将退出当前 App 并打开卸载程序。只移除程序和快捷方式，保留会话、配置及工作区文件。请先保存当前工作。',
+    buttons: ['卸载', '取消'], defaultId: 1, cancelId: 1, noLink: true,
+  })
+  if (response.response !== 0) return
+  try {
+    const uninstallerPath = join(dirname(process.execPath), `Uninstall ${PRODUCT_NAME}.exe`)
+    await access(uninstallerPath)
+    await supervisor.stop()
+    const uninstaller = spawn(uninstallerPath, [], { detached: true, stdio: 'ignore', windowsHide: false })
+    await once(uninstaller, 'spawn')
+    uninstaller.unref()
+    await quit()
+  } catch (cause: unknown) {
+    if (!supervisor.running) await restartHost()
+    dialog.showErrorBox('无法打开卸载程序', `${cause instanceof Error ? cause.message : String(cause)}\n\n也可在 Windows 设置的“已安装的应用”中卸载。`)
+  }
+}
+
 function createTray(): void {
   const source = nativeImage.createFromPath(applicationIconPath())
   const icon = process.platform === 'darwin' ? source.resize({ width: 22, height: 22 }) : source
@@ -276,6 +316,10 @@ function createApplicationMenu(): void {
       submenu: [
         { label: '打开主窗口', click: showWindow },
         { label: '重新启动 Harness Host', click: () => { void restartHost() } },
+        ...(process.platform === 'win32' && app.isPackaged ? [
+          { label: '创建桌面快捷方式', click: () => { void createDesktopShortcut() } },
+          { label: '卸载应用…', click: () => { void uninstallApplication() } },
+        ] : []),
         { type: 'separator' },
         { role: 'quit', label: '退出' },
       ],
@@ -360,6 +404,7 @@ async function recoverHost(event: UnexpectedHostExit): Promise<void> {
 }
 
 async function launch(): Promise<void> {
+  if (process.platform === 'win32') app.setAppUserModelId(APP_ID)
   const packagedHostEntry = hostEntry()
   supervisor = new HostSupervisor({
     ...(packagedHostEntry === undefined ? {} : { hostEntry: packagedHostEntry }),

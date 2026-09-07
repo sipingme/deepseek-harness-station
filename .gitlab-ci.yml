@@ -58,6 +58,6 @@ windows-x64:
     paths:
       # The installer is already in the permanent Generic Package Registry.
       # Re-uploading it here exceeds this GitLab instance's artifact size limit.
-      - dist/DeepSeek-Harness-Station-*-x64-Setup.exe.blockmap
       - dist/SHA256SUMS.txt
       - dist/PACKAGE.txt
+      - dist/installer-timings.json

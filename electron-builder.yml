@@ -12,6 +12,7 @@ files:
   - THIRD_PARTY_NOTICES.txt
   - '!lib/types{,/**/*}'
   - '!**/*.map'
+  - '!**/*.d.{mts,cts}'
 asarUnpack:
   - lib/host{,/**/*}
   - lib/protocol.js
@@ -41,6 +42,7 @@ win:
     - THIRD_PARTY_NOTICES.txt
     - '!lib/types{,/**/*}'
     - '!**/*.map'
+    - '!**/*.d.{mts,cts}'
     - '!node_modules/**/prebuilds/darwin-{arm64,x64}{,/**/*}'
     - '!node_modules/**/prebuilds/linux-{arm64,x64}{,/**/*}'
     - '!node_modules/**/prebuilds/win32-arm64{,/**/*}'
@@ -51,8 +53,13 @@ nsis:
   perMachine: false
   allowElevation: true
   allowToChangeInstallationDirectory: true
-  createDesktopShortcut: true
+  # ZIP is extracted directly into INSTDIR; 7z stages and copies every file twice.
+  useZip: true
+  differentialPackage: false
+  include: build-resources/installer.nsh
+  createDesktopShortcut: always
   createStartMenuShortcut: true
+  menuCategory: DeepSeek Harness Station
   shortcutName: DeepSeek Harness Station
   uninstallDisplayName: DeepSeek Harness Station
   deleteAppDataOnUninstall: false
@@ -71,6 +78,7 @@ mac:
     - THIRD_PARTY_NOTICES.txt
     - '!lib/types{,/**/*}'
     - '!**/*.map'
+    - '!**/*.d.{mts,cts}'
     - '!node_modules/**/prebuilds/win32-{arm64,x64}{,/**/*}'
     - '!node_modules/**/prebuilds/linux-{arm64,x64}{,/**/*}'
     - '!node_modules/**/third_party/**/win10-{arm64,x64}{,/**/*}'

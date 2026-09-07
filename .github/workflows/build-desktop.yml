@@ -38,8 +38,8 @@ jobs:
           name: DeepSeek-Harness-Station-Windows-x64
           path: |
             dist/DeepSeek-Harness-Station-*-x64-Setup.exe
-            dist/DeepSeek-Harness-Station-*-x64-Setup.exe.blockmap
             dist/SHA256SUMS.txt
+            dist/installer-timings.json
           if-no-files-found: error
           retention-days: 14
       - name: Publish GitHub Release assets
@@ -51,7 +51,7 @@ jobs:
           $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
           if ($env:GITHUB_REF_NAME -cne "v$version") { throw 'Release tag must match package.json version' }
           $installer = Get-Item -LiteralPath "dist/DeepSeek-Harness-Station-$version-x64-Setup.exe"
-          $assets = @($installer.FullName, "$($installer.FullName).blockmap", (Resolve-Path 'dist/SHA256SUMS.txt').Path)
+          $assets = @($installer.FullName, (Resolve-Path 'dist/SHA256SUMS.txt').Path)
           gh release view $env:GITHUB_REF_NAME 2>$null
           if ($LASTEXITCODE -eq 0) {
             gh release upload $env:GITHUB_REF_NAME @assets --clobber

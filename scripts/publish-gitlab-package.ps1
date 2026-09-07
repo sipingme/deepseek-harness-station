@@ -13,11 +13,6 @@ if (-not $installer) {
   throw 'Windows installer was not found in dist'
 }
 
-$blockmapPath = "$($installer.FullName).blockmap"
-if (-not (Test-Path -LiteralPath $blockmapPath -PathType Leaf)) {
-  throw "Installer blockmap was not found: $blockmapPath"
-}
-
 $packageVersion = if ($env:CI_COMMIT_TAG) {
   $env:CI_COMMIT_TAG.TrimStart('v')
 } else {
@@ -31,7 +26,7 @@ $hash = (Get-FileHash -LiteralPath $installer.FullName -Algorithm SHA256).Hash
 $checksumPath = Join-Path $installer.DirectoryName 'SHA256SUMS.txt'
 Set-Content -LiteralPath $checksumPath -Encoding ascii -Value "$hash  $($installer.Name)"
 
-$files = @($installer.FullName, $blockmapPath, $checksumPath)
+$files = @($installer.FullName, $checksumPath)
 foreach ($path in $files) {
   $file = Get-Item -LiteralPath $path
   $uploadUrl = "$packageBaseUrl/$([Uri]::EscapeDataString($file.Name))"
