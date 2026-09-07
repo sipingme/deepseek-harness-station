@@ -352,7 +352,7 @@ function createApplicationMenu(): void {
       submenu: [
         { label: `当前版本 ${app.getVersion()}`, enabled: false },
         { label: '检查更新…', click: () => { void runUpdateCheck(true) } },
-        { label: '版本发布页', click: () => { void shell.openExternal('https://github.com/sipingme/deepseek-harness-station/releases') } },
+        { label: '版本发布页', click: () => { void shell.openExternal('https://172.16.2.16/development/deepseek-harness-station/-/releases') } },
       ],
     },
   ]))

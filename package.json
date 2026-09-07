@@ -1,6 +1,6 @@
 {
   "name": "deepseek-harness-station",
-  "version": "0.26.9-beta.8",
+  "version": "0.26.9-beta.9",
   "private": true,
   "description": "Electron workstation for DeepSeek Harness with an independently supervised Host",
   "author": "DeepSeek Harness Station contributors",
