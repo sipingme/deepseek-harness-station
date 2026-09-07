@@ -56,7 +56,8 @@ windows-x64:
     name: "DeepSeek-Harness-Station-Windows-x64-${CI_COMMIT_SHORT_SHA}"
     expire_in: 14 days
     paths:
-      - dist/DeepSeek-Harness-Station-*-x64-Setup.exe
+      # The installer is already in the permanent Generic Package Registry.
+      # Re-uploading it here exceeds this GitLab instance's artifact size limit.
       - dist/DeepSeek-Harness-Station-*-x64-Setup.exe.blockmap
       - dist/SHA256SUMS.txt
       - dist/PACKAGE.txt

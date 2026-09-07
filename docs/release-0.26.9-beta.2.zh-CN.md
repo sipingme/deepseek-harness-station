@@ -16,7 +16,10 @@
 - `SHA256SUMS.txt`，其中包含该安装包的 SHA-256
 
 旧版检查器依赖上述命名；仅推送 main 或上传 Actions artifact 不会通知已安装用户。
+`0.1.3` 和 `0.26.9-beta.0` 使用 GitHub main 的 package.json 检查版本，下载按钮指向内网 GitLab Release。因此发布时也必须同步 GitHub main，并建立对应的内网 Release 页面，链接到 Generic Package Registry 中的安装包。
 `0.26.9-beta.1` 用户联网且 GitHub API 可用时，会在启动约 10 秒后或后续定时检查时收到更新弹窗，也可从托盘或应用菜单选择“检查更新”。新版本的备用检查源无法追溯修复旧客户端的 API 限流问题。
+
+GitLab 的 CI artifacts 只保留 blockmap、校验文件和 PACKAGE.txt；安装器存放在 Generic Package Registry，避免重复上传大型 archive 触发 HTTP 413。
 
 ## 用户升级
 
