@@ -125,8 +125,14 @@ await timed('repair-install', installer, ['/S', '/currentuser', `/D=${installDir
 verifyLinks(state(), uninstaller)
 await timed('uninstall', uninstaller, ['/S'], 180_000)
 await waitUntilRemoved(installDir, 60_000)
-const final = state()
-if (final.registrations.length || final.shortcuts.length) throw new Error('Uninstaller left application registrations or shortcuts')
+// NSIS removes the directory before its child finishes shortcut/registry cleanup.
+const cleanupDeadline = Date.now() + 60_000
+let final = state()
+while (final.registrations.length || final.shortcuts.length) {
+  if (Date.now() >= cleanupDeadline) throw new Error(`Uninstaller left application registrations or shortcuts: ${JSON.stringify(final)}`)
+  await new Promise(resolveDelay => setTimeout(resolveDelay, 500))
+  final = state()
+}
 for (const file of sentinels) {
   if (await readFile(file, 'utf8') !== 'keep user data') throw new Error(`Uninstaller modified user data: ${file}`)
   await rm(file)
