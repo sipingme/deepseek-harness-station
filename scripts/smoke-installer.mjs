@@ -1,7 +1,6 @@
 import { access, cp, mkdir, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises'
 import { execFileSync, spawn } from 'node:child_process'
 import { dirname, join, resolve, sep } from 'node:path'
-import { tmpdir } from 'node:os'
 import { resolveDshHome } from '@deepseek-ai/dsh-home-paths'
 import { Arch, build, Platform } from 'electron-builder'
 
@@ -15,7 +14,9 @@ const smokeRoot = resolve(projectRoot, 'dist', `installer-smoke-${process.pid}-$
 if (!smokeRoot.startsWith(resolve(projectRoot, 'dist') + sep)) throw new Error('Invalid installer smoke directory')
 const payload = join(smokeRoot, 'payload')
 const installer = join(smokeRoot, 'Station-Installer-Smoke.exe')
-const installDir = join(tmpdir(), `dhs-${process.pid}-${Date.now().toString(36)}`)
+// GitHub's TEMP uses an 8.3 alias; WScript resolves shortcut targets to long
+// paths, making string comparisons unreliable. Use a canonical workspace path.
+const installDir = join(smokeRoot, 'installed')
 const product = `Station Installer Test ${process.pid}`
 const timings = {}
 
