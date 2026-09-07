@@ -1,23 +1,23 @@
-import { access, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises'
+import { access, cp, mkdir, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises'
 import { execFileSync, spawn } from 'node:child_process'
-import { dirname, join, resolve } from 'node:path'
+import { dirname, join, resolve, sep } from 'node:path'
 import { tmpdir } from 'node:os'
 import { resolveDshHome } from '@deepseek-ai/dsh-home-paths'
-
-if (process.env.GITHUB_ACTIONS !== 'true' && process.env.GITLAB_CI !== 'true') {
-  throw new Error('Installer smoke must run in an isolated CI Windows account; it must not replace a user installation or shortcuts.')
-}
+import { Arch, build, Platform } from 'electron-builder'
 
 const manifest = await import('../package.json', { with: { type: 'json' } }).then(module => module.default)
 const projectRoot = new URL('..', import.meta.url).pathname.slice(1).replaceAll('/', '\\')
-const installer = join(projectRoot, 'dist', `DeepSeek-Harness-Station-${manifest.version}-x64-Setup.exe`)
+const smokeRoot = resolve(projectRoot, 'dist', `installer-smoke-${process.pid}-${Date.now()}`)
+if (!smokeRoot.startsWith(resolve(projectRoot, 'dist') + sep)) throw new Error('Invalid installer smoke directory')
+const payload = join(smokeRoot, 'payload')
+const installer = join(smokeRoot, 'Station-Installer-Smoke.exe')
 const installDir = join(tmpdir(), `dhs-${process.pid}-${Date.now().toString(36)}`)
-const product = 'DeepSeek Harness Station'
+const product = `Station Installer Test ${process.pid}`
 const timings = {}
 
-function state() {
+function state(name = product) {
   return JSON.parse(execFileSync('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File',
-    join(projectRoot, 'scripts', 'read-windows-install-state.ps1')], { encoding: 'utf8', windowsHide: true }))
+    join(projectRoot, 'scripts', 'read-windows-install-state.ps1'), '-Product', name], { encoding: 'utf8', windowsHide: true }))
 }
 
 function samePath(left, right) { return resolve(left).toLowerCase() === resolve(right).toLowerCase() }
@@ -72,9 +72,27 @@ async function waitUntilRemoved(path, timeoutMs) {
   throw new Error(`Uninstaller did not remove ${path}`)
 }
 
+// Use the production payload and NSIS hooks with a separate executable, GUID,
+// registry key and shortcut names. Never run the production installer as a test.
+await cp(join(projectRoot, 'dist', 'win-unpacked'), payload, { recursive: true })
+await rename(join(payload, 'DeepSeek Harness Station.exe'), join(payload, `${product}.exe`))
+await build({
+  projectDir: projectRoot, prepackaged: payload, publish: 'never',
+  targets: Platform.WINDOWS.createTarget('nsis', Arch.x64),
+  config: {
+    extends: join(projectRoot, 'electron-builder.yml'),
+    appId: `com.siping.deepseek-harness-station.installer-test.${process.pid}`,
+    productName: product,
+    extraMetadata: { name: `station-installer-test-${process.pid}` },
+    directories: { output: smokeRoot },
+    win: { executableName: product, artifactName: 'Station-Installer-Smoke.exe' },
+    nsis: { shortcutName: product, menuCategory: product, uninstallDisplayName: product },
+  },
+})
+const productionBefore = state('DeepSeek Harness Station')
 const initial = state()
 if (initial.registrations.length || initial.shortcuts.length || initial.running) {
-  throw new Error('Installer smoke refused: this Windows account already has a Station installation, shortcut, or running process.')
+  throw new Error(`Installer smoke refused: test identity is already in use: ${JSON.stringify(initial)}`)
 }
 const sentinelName = `station-uninstall-smoke-${process.pid}.txt`
 const sentinels = [join(resolveDshHome(), sentinelName), join(initial.appData, product, sentinelName)]
@@ -83,7 +101,7 @@ for (const file of sentinels) {
   await writeFile(file, 'keep user data', { flag: 'wx' })
 }
 await timed('install', installer, ['/S', `/D=${installDir}`], 360_000)
-await access(join(installDir, 'DeepSeek Harness Station.exe'))
+await access(join(installDir, `${product}.exe`))
 const uninstallerName = (await readdir(installDir)).find(name => /^unins.*\.exe$/i.test(name) || /^uninstall.*\.exe$/i.test(name))
 if (uninstallerName === undefined) throw new Error('Installed application has no uninstaller')
 const uninstaller = join(installDir, uninstallerName)
@@ -107,4 +125,10 @@ for (const file of sentinels) {
   await rm(file)
 }
 await writeFile(join(projectRoot, 'dist', 'installer-timings.json'), JSON.stringify(timings, null, 2))
+const productionAfter = state('DeepSeek Harness Station')
+if (JSON.stringify(productionBefore.registrations) !== JSON.stringify(productionAfter.registrations)
+  || JSON.stringify(productionBefore.shortcuts) !== JSON.stringify(productionAfter.shortcuts)) {
+  throw new Error('Production installation registration or shortcuts changed during the test')
+}
+await rm(smokeRoot, { recursive: true, force: true, maxRetries: 5, retryDelay: 250 })
 console.log('Installer smoke passed: install, shortcut icons, repair install, uninstall entry, link cleanup, and user-data preservation verified')

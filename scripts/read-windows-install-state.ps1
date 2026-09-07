@@ -1,6 +1,7 @@
+param([string]$Product = 'DeepSeek Harness Station')
+
 $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)
-$product = 'DeepSeek Harness Station'
 $registryRoots = @(
   'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall',
   'HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall'
