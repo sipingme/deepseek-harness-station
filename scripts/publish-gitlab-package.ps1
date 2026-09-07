@@ -49,3 +49,30 @@ Set-Content -LiteralPath (Join-Path $installer.DirectoryName 'PACKAGE.txt') -Enc
 
 Write-Host "Published GitLab generic package $packageName $packageVersion"
 Write-Host "Package registry: $packagePage"
+
+if ($env:CI_COMMIT_TAG) {
+  $releasesUrl = "$env:CI_API_V4_URL/projects/$env:CI_PROJECT_ID/releases"
+  $releaseUrl = "$releasesUrl/$([Uri]::EscapeDataString($env:CI_COMMIT_TAG))"
+  $notesPath = "docs/release-$version.zh-CN.md"
+  $notes = if (Test-Path -LiteralPath $notesPath) { Get-Content -LiteralPath $notesPath -Raw -Encoding utf8 } else { "DeepSeek Harness Station $version" }
+  $installerUrl = "$packageBaseUrl/$([Uri]::EscapeDataString($installer.Name))"
+  $notes = "[点击直接下载安装包]($installerUrl)`n`n$notes"
+  $existing = $null
+  try {
+    $existing = Invoke-RestMethod -Uri $releaseUrl -Headers $headers
+  } catch {
+    if ([int]$_.Exception.Response.StatusCode -ne 404) { throw }
+  }
+  $body = @{ name = "DeepSeek Harness Station $version"; description = $notes }
+  if ($existing) {
+    Invoke-RestMethod -Uri $releaseUrl -Method Put -Headers $headers -ContentType 'application/json; charset=utf-8' -Body ($body | ConvertTo-Json -Depth 8) | Out-Null
+  } else {
+    $body.tag_name = $env:CI_COMMIT_TAG
+    $body.assets = @{ links = @($files | ForEach-Object {
+      $assetName = [IO.Path]::GetFileName($_)
+      @{ name = $assetName; url = "$packageBaseUrl/$([Uri]::EscapeDataString($assetName))"; direct_asset_path = "/$assetName"; link_type = 'package' }
+    }) }
+    Invoke-RestMethod -Uri $releasesUrl -Method Post -Headers $headers -ContentType 'application/json; charset=utf-8' -Body ($body | ConvertTo-Json -Depth 8) | Out-Null
+  }
+  Write-Host "Published GitLab release $env:CI_COMMIT_TAG"
+}

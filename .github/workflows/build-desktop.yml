@@ -57,7 +57,8 @@ jobs:
             gh release upload $env:GITHUB_REF_NAME @assets --clobber
             if ($LASTEXITCODE -ne 0) { throw 'Release asset upload failed' }
           } else {
-            gh release create $env:GITHUB_REF_NAME @assets --verify-tag --generate-notes --prerelease --title "DeepSeek Harness Station $env:GITHUB_REF_NAME"
+            $notesArgs = if (Test-Path "docs/release-$version.zh-CN.md") { @('--notes-file', "docs/release-$version.zh-CN.md") } else { @('--generate-notes') }
+            gh release create $env:GITHUB_REF_NAME @assets --verify-tag @notesArgs --prerelease --title "DeepSeek Harness Station $env:GITHUB_REF_NAME"
             if ($LASTEXITCODE -ne 0) { throw 'Release publication failed' }
           }
 

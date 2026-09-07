@@ -26,7 +26,7 @@ import {
 } from '../protocol.js'
 import { stationDirectoryPickerPatches } from './directory-picker.js'
 import { stationModelPatches } from './model-config.js'
-import { shippedAgentPresetPatches } from './profile-config.js'
+import { desktopWebPatches, shippedAgentPresetPatches } from './profile-config.js'
 import { prepareGenerationRoot } from './workspace.js'
 
 const NAME = 'dsh-station-host'
@@ -73,6 +73,7 @@ async function composeProfile(
     patches: structuredClone([
       ...lowerPatches,
       ...shippedAgentPresetPatches(anchor, lowerPatches),
+      ...desktopWebPatches(lowerPatches),
     ]),
   }
 }

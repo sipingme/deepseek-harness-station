@@ -48,6 +48,7 @@ let logs = ''
 try {
   const previousApp = process.argv[2]
   const preservedConfig = '# Station upgrade smoke fixture\nSTATION_UPGRADE_FIXTURE=preserved\n'
+  const browserEnabledPatch = '- id: web-runtime\n  config:\n    openBrowser: true\n    printUrl: true\n    surfaceContext: true\n'
   if (previousApp !== undefined) {
     await mkdir(dshHome, { recursive: true })
     await writeFile(join(dshHome, '.env'), preservedConfig)
@@ -65,6 +66,9 @@ try {
     // no-external-browser assertion below belongs to the new application.
     logs = ''
   }
+  // Reproduce a persisted Web preference that would override --no-open.
+  await mkdir(dshHome, { recursive: true })
+  await writeFile(join(dshHome, 'cordis.patch.yml'), browserEnabledPatch)
   first = spawn(executable, [`--user-data-dir=${userData}`], {
     env: {
       ...process.env,
@@ -106,7 +110,7 @@ try {
   if (leftovers.length !== 0) throw new Error(`Host generation cleanup left ${leftovers.length} directories`)
   if (previousApp !== undefined) {
     if (await readFile(join(dshHome, '.env'), 'utf8') !== preservedConfig
-      || await readFile(join(dshHome, 'cordis.patch.yml'), 'utf8') !== '[]\n') {
+      || await readFile(join(dshHome, 'cordis.patch.yml'), 'utf8') !== browserEnabledPatch) {
       throw new Error('Upgrade changed user configuration')
     }
     console.log('Upgrade smoke passed: previous and new packaged apps booted with the same home; user configuration preserved')

@@ -146,17 +146,16 @@ async function showUpdateResult(result: UpdateCheckResult, manual: boolean): Pro
     type: 'info',
     title: '发现新版本',
     message: `DeepSeek Harness Station ${result.latestVersion} 已发布`,
-    detail: `当前版本：${result.currentVersion}\n最新版本：${result.latestVersion}\n\n确认后下载并校验官方发布包，也可打开发布页手动下载安装。安装前请保存当前工作。`,
-    buttons: ['下载并安装', '手动下载 / 版本说明', '稍后提醒'],
+    detail: `当前版本：${result.currentVersion}\n最新版本：${result.latestVersion}\n\n点击后直接下载安装包，下载完成并校验通过后，再由您确认安装。安装前请保存当前工作。`,
+    buttons: ['立即下载', '稍后提醒'],
     defaultId: 0,
-    cancelId: 2,
+    cancelId: 1,
     noLink: true,
   }
   const response = window === undefined || window.isDestroyed()
     ? await dialog.showMessageBox(options)
     : await dialog.showMessageBox(window, options)
   if (response.response === 0) await downloadAndInstallUpdate(result)
-  else if (response.response === 1) await shell.openExternal(result.releaseUrl)
 }
 
 async function downloadAndInstallUpdate(result: UpdateCheckResult): Promise<void> {
@@ -179,7 +178,7 @@ async function downloadAndInstallUpdate(result: UpdateCheckResult): Promise<void
   tray?.setToolTip(`${PRODUCT_NAME} · 正在下载 ${result.latestVersion}`)
   try {
     const installerPath = await downloadVerifiedInstaller(result, {
-      downloadDirectory: join(app.getPath('temp'), 'deepseek-harness-station-updates', result.latestVersion),
+      downloadDirectory: join(app.getPath('downloads'), 'DeepSeek Harness Station', result.latestVersion),
       onProgress: progress => {
         if (progress.totalBytes !== undefined) {
           targetWindow?.setProgressBar(progress.receivedBytes / progress.totalBytes)
@@ -191,7 +190,7 @@ async function downloadAndInstallUpdate(result: UpdateCheckResult): Promise<void
       type: 'info',
       title: '更新已准备完成',
       message: `DeepSeek Harness Station ${result.latestVersion} 已下载并通过校验`,
-      detail: '点击“安装并重启”后，当前 App 会退出并启动安装程序。',
+      detail: `安装包已保存到：${installerPath}\n\n点击“安装并重启”后，当前 App 会退出并启动安装程序。选择“稍后安装”可保留安装包。`,
       buttons: ['安装并重启', '稍后安装'],
       defaultId: 0,
       cancelId: 1,
