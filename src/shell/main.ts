@@ -149,8 +149,8 @@ async function showUpdateResult(result: UpdateCheckResult, manual: boolean): Pro
     type: 'info',
     title: '发现新版本',
     message: `DeepSeek Harness Station ${result.latestVersion} 已发布`,
-    detail: `当前版本：${result.currentVersion}\n最新版本：${result.latestVersion}\n\n点击后直接下载安装包，下载完成并校验通过后，再由您确认安装。安装前请保存当前工作。`,
-    buttons: ['立即下载', '稍后提醒'],
+    detail: `当前版本：${result.currentVersion}\n最新版本：${result.latestVersion}\n\n点击“下载并安装”后，下载完成并校验通过会自动启动安装程序，当前 App 随即退出。请先保存当前工作。`,
+    buttons: ['下载并安装', '稍后提醒'],
     defaultId: 0,
     cancelId: 1,
     noLink: true,
@@ -189,22 +189,12 @@ async function downloadAndInstallUpdate(result: UpdateCheckResult): Promise<void
       },
     })
     targetWindow?.setProgressBar(-1)
-    const ready = await dialog.showMessageBox({
-      type: 'info',
-      title: '更新已准备完成',
-      message: `DeepSeek Harness Station ${result.latestVersion} 已下载并通过校验`,
-      detail: `安装包已保存到：${installerPath}\n\n点击“安装并重启”后，当前 App 会退出并启动安装程序。选择“稍后安装”可保留安装包。`,
-      buttons: ['安装并重启', '稍后安装'],
-      defaultId: 0,
-      cancelId: 1,
-      noLink: true,
-    })
-    if (ready.response !== 0) return
     const installer = spawn(installerPath, [], {
       detached: true,
       stdio: 'ignore',
       windowsHide: false,
     })
+    await once(installer, 'spawn')
     installer.unref()
     await quit()
   } catch (cause: unknown) {
@@ -212,7 +202,7 @@ async function downloadAndInstallUpdate(result: UpdateCheckResult): Promise<void
     await dialog.showMessageBox({
       type: 'error',
       title: '升级失败',
-      message: '新版本下载或校验失败',
+      message: '无法完成更新下载、校验或启动安装程序',
       detail: cause instanceof Error ? cause.message : String(cause),
       buttons: ['确定'],
     })
