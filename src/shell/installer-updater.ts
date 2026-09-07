@@ -28,11 +28,11 @@ export function expectedInstallerHash(checksumText: string, installerFilename: s
   throw new Error(`SHA-256 校验文件中没有 ${installerFilename}`)
 }
 
-async function fetchChecked(url: string, fetchDownload: typeof fetch): Promise<Response> {
+async function fetchChecked(url: string, fetchDownload: typeof fetch, signal = AbortSignal.timeout(downloadTimeoutMs)): Promise<Response> {
   const response = await fetchDownload(url, {
     cache: 'no-store',
     redirect: 'follow',
-    signal: AbortSignal.timeout(downloadTimeoutMs),
+    signal,
   })
   if (!response.ok) throw new Error(`更新服务器返回 HTTP ${response.status}`)
   return response
@@ -48,44 +48,58 @@ export async function downloadVerifiedInstaller(
   const fetchDownload = options.fetchDownload ?? fetch
   const checksumResponse = await fetchChecked(result.checksumUrl, fetchDownload)
   const expectedHash = expectedInstallerHash(await checksumResponse.text(), result.installerFilename)
-  const installerResponse = await fetchChecked(result.installerUrl, fetchDownload)
-  if (installerResponse.body === null) throw new Error('更新服务器没有返回安装包内容')
-
-  await mkdir(options.downloadDirectory, { recursive: true })
-  const installerPath = join(options.downloadDirectory, result.installerFilename)
-  const partialPath = `${installerPath}.part`
-  await rm(partialPath, { force: true })
-  await rm(installerPath, { force: true })
-
-  const totalHeader = Number(installerResponse.headers.get('content-length') ?? '')
-  const totalBytes = Number.isFinite(totalHeader) && totalHeader > 0 ? totalHeader : undefined
-  const hash = createHash('sha256')
-  const writer = createWriteStream(partialPath, { flags: 'wx' })
-  const reader = installerResponse.body.getReader()
-  let receivedBytes = 0
+  const downloadController = new AbortController()
+  let idleTimer: ReturnType<typeof setTimeout> | undefined
+  const resetIdleTimeout = () => {
+    clearTimeout(idleTimer)
+    idleTimer = setTimeout(() => downloadController.abort(new Error('安装包下载长时间没有进展，请重试')), downloadTimeoutMs)
+    idleTimer.unref()
+  }
+  resetIdleTimeout()
   try {
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) break
-      const chunk = Buffer.from(value)
-      hash.update(chunk)
-      receivedBytes += chunk.length
-      if (!writer.write(chunk)) await once(writer, 'drain')
-      options.onProgress?.({ receivedBytes, ...(totalBytes === undefined ? {} : { totalBytes }) })
-    }
-    writer.end()
-    await once(writer, 'finish')
-    const actualHash = hash.digest('hex')
-    if (actualHash !== expectedHash) {
-      throw new Error(`安装包 SHA-256 校验失败：期望 ${expectedHash}，实际 ${actualHash}`)
-    }
-    await rename(partialPath, installerPath)
-    return installerPath
-  } catch (cause: unknown) {
-    writer.destroy()
+    const installerResponse = await fetchChecked(result.installerUrl, fetchDownload, downloadController.signal)
+    if (installerResponse.body === null) throw new Error('更新服务器没有返回安装包内容')
+
+    await mkdir(options.downloadDirectory, { recursive: true })
+    const installerPath = join(options.downloadDirectory, result.installerFilename)
+    const partialPath = `${installerPath}.part`
     await rm(partialPath, { force: true })
-    throw cause
+    await rm(installerPath, { force: true })
+
+    const totalHeader = Number(installerResponse.headers.get('content-length') ?? '')
+    const totalBytes = Number.isFinite(totalHeader) && totalHeader > 0 ? totalHeader : undefined
+    const hash = createHash('sha256')
+    const writer = createWriteStream(partialPath, { flags: 'wx' })
+    const reader = installerResponse.body.getReader()
+    let receivedBytes = 0
+    try {
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        resetIdleTimeout()
+        const chunk = Buffer.from(value)
+        hash.update(chunk)
+        receivedBytes += chunk.length
+        if (!writer.write(chunk)) await once(writer, 'drain')
+        options.onProgress?.({ receivedBytes, ...(totalBytes === undefined ? {} : { totalBytes }) })
+      }
+      writer.end()
+      await once(writer, 'finish')
+      const actualHash = hash.digest('hex')
+      if (actualHash !== expectedHash) {
+        throw new Error(`安装包 SHA-256 校验失败：期望 ${expectedHash}，实际 ${actualHash}`)
+      }
+      await rename(partialPath, installerPath)
+      return installerPath
+    } catch (cause: unknown) {
+      writer.destroy()
+      await rm(partialPath, { force: true })
+      throw cause
+    } finally {
+      reader.releaseLock()
+    }
   } finally {
-    reader.releaseLock()
+    clearTimeout(idleTimer)
+    downloadController.abort()
   }
 }
