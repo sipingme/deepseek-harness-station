@@ -5,6 +5,10 @@ import { tmpdir } from 'node:os'
 import { resolveDshHome } from '@deepseek-ai/dsh-home-paths'
 import { Arch, build, Platform } from 'electron-builder'
 
+process.on('uncaughtExceptionMonitor', error => {
+  if (process.env.GITHUB_ACTIONS) console.error(`::error::${error.message.replaceAll('%', '%25').replaceAll('\r', '%0D').replaceAll('\n', '%0A')}`)
+})
+
 const manifest = await import('../package.json', { with: { type: 'json' } }).then(module => module.default)
 const projectRoot = new URL('..', import.meta.url).pathname.slice(1).replaceAll('/', '\\')
 const smokeRoot = resolve(projectRoot, 'dist', `installer-smoke-${process.pid}-${Date.now()}`)
@@ -16,7 +20,9 @@ const product = `Station Installer Test ${process.pid}`
 const timings = {}
 
 function state(name = product) {
-  return JSON.parse(execFileSync('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File',
+  // NSIS is a 32-bit process: resolve SYSTEM profile folders in the same view.
+  const powershell = join(process.env.SystemRoot ?? 'C:\\Windows', 'SysWOW64', 'WindowsPowerShell', 'v1.0', 'powershell.exe')
+  return JSON.parse(execFileSync(powershell, ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File',
     join(projectRoot, 'scripts', 'read-windows-install-state.ps1'), '-Product', name], { encoding: 'utf8', windowsHide: true }))
 }
 
@@ -27,7 +33,7 @@ function verifyLinks(snapshot, uninstaller) {
   for (const path of [join(snapshot.desktop, `${product}.lnk`), join(snapshot.programs, product, `${product}.lnk`)]) {
     const link = snapshot.shortcuts.find(item => samePath(item.path, path))
     if (!link || !samePath(link.target, exe) || !link.icon.toLowerCase().startsWith(exe.toLowerCase())) {
-      throw new Error(`Missing or incorrect application shortcut/icon: ${path}`)
+      throw new Error(`Missing or incorrect application shortcut/icon: ${path}; state=${JSON.stringify(snapshot)}`)
     }
   }
   if (!snapshot.shortcuts.some(link => samePath(link.target, uninstaller))) throw new Error('Start menu uninstaller shortcut is missing')
@@ -100,7 +106,7 @@ for (const file of sentinels) {
   await mkdir(dirname(file), { recursive: true })
   await writeFile(file, 'keep user data', { flag: 'wx' })
 }
-await timed('install', installer, ['/S', `/D=${installDir}`], 360_000)
+await timed('install', installer, ['/S', '/currentuser', `/D=${installDir}`], 360_000)
 await access(join(installDir, `${product}.exe`))
 const uninstallerName = (await readdir(installDir)).find(name => /^unins.*\.exe$/i.test(name) || /^uninstall.*\.exe$/i.test(name))
 if (uninstallerName === undefined) throw new Error('Installed application has no uninstaller')
@@ -114,7 +120,7 @@ for (const link of installed.shortcuts) {
   }
   await rm(link.path)
 }
-await timed('repair-install', installer, ['/S', `/D=${installDir}`], 360_000)
+await timed('repair-install', installer, ['/S', '/currentuser', `/D=${installDir}`], 360_000)
 verifyLinks(state(), uninstaller)
 await timed('uninstall', uninstaller, ['/S'], 180_000)
 await waitUntilRemoved(installDir, 60_000)
