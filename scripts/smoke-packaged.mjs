@@ -92,6 +92,11 @@ try {
   if (result.ok !== true || result.packaged !== true || !String(result.origin).startsWith('http://127.0.0.1:')) {
     throw new Error(`Invalid packaged readiness result: ${JSON.stringify(result)}`)
   }
+  const expectedHarness = JSON.parse(await readFile(join(projectRoot, 'node_modules', '@deepseek-ai', 'dsh', 'package.json'), 'utf8')).version
+  if (typeof result.harnessVersion !== 'string' || result.harnessVersion !== expectedHarness) {
+    throw new Error(`Displayed Harness version ${result.harnessVersion} does not match bundled dependency ${expectedHarness}`)
+  }
+  console.log(`Packaged Harness version verified: ${result.harnessVersion}`)
 
   const second = spawn(executable, [
     `--user-data-dir=${userData}`,

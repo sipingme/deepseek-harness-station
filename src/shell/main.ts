@@ -2,6 +2,7 @@
 
 import { spawn } from 'node:child_process'
 import { once } from 'node:events'
+import { createRequire } from 'node:module'
 import { access } from 'node:fs/promises'
 import { writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -15,6 +16,7 @@ import { checkForUpdate, RELEASES_BASE_URL, type UpdateCheckResult } from './upd
 
 const PRODUCT_NAME = 'DeepSeek Harness Station'
 const APP_ID = 'com.siping.deepseek-harness-station'
+const harnessVersion = (createRequire(import.meta.url)('@deepseek-ai/dsh/package.json') as { version: string }).version
 const smokeFile = process.env.STATION_SMOKE_FILE
 const smokeHoldMs = Number(process.env.STATION_SMOKE_HOLD_MS ?? '0')
 const recoveryLimit = 3
@@ -280,6 +282,17 @@ async function uninstallApplication(): Promise<void> {
   }
 }
 
+async function showVersionInfo(): Promise<void> {
+  await dialog.showMessageBox({
+    type: 'info',
+    title: '版本信息',
+    message: PRODUCT_NAME,
+    detail: `Station 版本：${app.getVersion()}\nDeepSeek Harness 版本：${harnessVersion}\n\n内置 Harness 随 Station 安装包更新。`,
+    buttons: ['关闭'],
+    noLink: true,
+  })
+}
+
 function createTray(): void {
   const source = nativeImage.createFromPath(applicationIconPath())
   const icon = process.platform === 'darwin' ? source.resize({ width: 22, height: 22 }) : source
@@ -288,6 +301,7 @@ function createTray(): void {
   tray.setContextMenu(Menu.buildFromTemplate([
     { label: '打开 DeepSeek Harness Station', click: showWindow },
     { label: `当前版本 ${app.getVersion()}`, enabled: false },
+    { label: '版本信息…', click: () => { void showVersionInfo() } },
     {
       label: '重新启动 Harness Host',
       click: () => { void restartHost() },
@@ -341,6 +355,8 @@ function createApplicationMenu(): void {
       label: '帮助',
       submenu: [
         { label: `当前版本 ${app.getVersion()}`, enabled: false },
+        { label: `DeepSeek Harness ${harnessVersion}`, enabled: false },
+        { label: '版本信息…', click: () => { void showVersionInfo() } },
         { label: '检查更新…', click: () => { void runUpdateCheck(true) } },
         { label: '版本发布页', click: () => { void shell.openExternal('https://172.16.2.16/development/deepseek-harness-station/-/releases') } },
       ],
@@ -411,7 +427,7 @@ async function launch(): Promise<void> {
   const origin = await startAndLoad()
   if (smokeFile === undefined) scheduleUpdateChecks()
   if (smokeFile !== undefined) {
-    writeFileSync(smokeFile, `${JSON.stringify({ ok: true, origin, packaged: app.isPackaged })}\n`, 'utf8')
+    writeFileSync(smokeFile, `${JSON.stringify({ ok: true, origin, packaged: app.isPackaged, harnessVersion })}\n`, 'utf8')
     if (Number.isFinite(smokeHoldMs) && smokeHoldMs > 0) {
       await new Promise(resolveDelay => setTimeout(resolveDelay, smokeHoldMs))
     }
